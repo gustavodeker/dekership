@@ -15,4 +15,4 @@ Sequencia pré-definida de desenvolvimento para próximas versões:
 - Alteração/criação de imagens melhores;
 - Melhoria e harmonização de cores e estilo do site.
 
-Os controles são apenas atraves do teclado atualmente, porém após o desenvolvimento dos itens anteriores será estudada a possibilidade da criação de botões/controles para jogar atraves de smartphones.
+Os controles são apenas atraves do teclado atualmente, porém após o desenvolvimento dos itens anteriores será estudada a possibilidade de criação de botões/controles para jogar atraves de smartphones.
