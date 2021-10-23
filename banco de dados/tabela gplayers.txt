@@ -1,0 +1,9 @@
+CREATE TABLE `gplayers` (
+  `id` int(13) NOT NULL PRIMARY KEY AUTO_INCREMENT,
+  `nome` varchar(50) COLLATE utf8_unicode_ci NOT NULL,
+  `nasc` date NOT NULL,
+  `sexo` varchar(15) COLLATE utf8_unicode_ci NOT NULL,
+  `email` varchar(50) COLLATE utf8_unicode_ci NOT NULL,
+  `nickname` varchar(20) COLLATE utf8_unicode_ci NOT NULL UNIQUE,
+  `senha` varchar(32) COLLATE utf8_unicode_ci NOT NULL
+)

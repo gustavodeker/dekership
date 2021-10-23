@@ -1,0 +1,8 @@
+CREATE TABLE cliente (
+	i_id_cliente INT PRIMARY KEY,
+	v_nome_cliente VARCHAR(50) NOT NULL,
+	v_sobrenome_cliente VARCHAR(50) NOT NULL,
+	v_email_cliente VARCHAR(100) NOT NULL,
+	i_idade_cliente TINYINT NOT NULL
+);
+

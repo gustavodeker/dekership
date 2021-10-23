@@ -1,0 +1,125 @@
+body{
+    overflow-x: hidden; /* não mostrar barra de rolagem */
+    overflow-y: hidden; /* não mostrar barra de rolagem */
+    background-color: rgb(240, 230, 220);
+}
+/***************************************************************/
+.conteiner{
+    display: grid;
+    grid-template-columns: auto 40% 40% auto;
+    grid-template-rows: auto;
+    gap: 10px;
+    grid-template-areas: 
+        "header header header header"
+        "lateral1 principal principal lateral2"
+        "footer footer footer footer"
+    ;
+}
+h1{
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+}
+.header{
+    /*background-color: blueviolet;*/
+    grid-area: header;
+    text-align: center;
+    font-size: 10pt;
+}
+.lateral1{
+    /*background-color: darkcyan;*/
+    grid-area: lateral1;
+}
+/**************************************************************/
+.principal{
+    display: grid;
+    grid-template-columns: auto auto auto;
+    grid-template-rows: auto;
+    grid-template-areas:
+    "painel painel painel"
+    "telaMsg telaMsg telaMsg"
+    "navJog navJog navJog";
+    background-color: rgb(252, 240, 231);
+    grid-area: principal;
+    height: 600px;
+    border-radius: 10px;
+    padding: 10px;
+}
+.painel{
+    grid-area: painel;
+}
+
+/*************************************************************/
+.lateral2{
+    /*background-color: darkcyan;*/
+    grid-area: lateral2;
+}
+.footer{
+    /*background-color: chartreuse;*/
+    grid-area: footer;
+}
+/**/
+/**********************************************************/
+.navJog{
+    grid-area: navJog;
+    width: 40px;
+    height: 48px;
+    background-image: url("../imgs/nave_jog.gif");
+    background-size: contain;
+    position: absolute;
+}
+.telaMsg{
+    grid-area: telaMsg;
+    position: flex;
+    margin-left: 25%;
+    top: 50px;
+    left: 50%;
+    width: 50%;
+    height:50%;
+    text-align: center;
+    padding-top: 10%;
+}
+#medidorPlaneta{
+    border: 2px solid #000;
+    width: 300px;
+    height: 20px;
+    background-color: #fff;
+    border-radius: 2px;
+}
+#barraPlaneta{
+    border-radius: 2px;
+    width: 300px;
+    height: 20px;
+    background-color: #55f;
+}
+.tiroJog{
+    width: 6px;
+    height: 6px;
+    background-color: #000;
+    border-radius: 6px;
+    position: absolute;
+}
+.bomba{
+    width: 16px;
+    height: 70px;
+    background-image: url("../imgs/bomba.gif");
+    background-size: contain;
+    position: absolute;
+}
+.explosaoChao{
+    width: 60;
+    height: 60;
+    background-size: contain;
+}
+.explosaoAr{
+    width: 70;
+    height: 70;
+    background-size: contain;
+}
+.btnJogar{
+    padding: 10px;
+    background-color: #55f;
+    color: #fff;
+    font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+    border-radius: 10px;
+    width: 50%;
+}
+

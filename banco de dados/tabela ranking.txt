@@ -1,0 +1,5 @@
+CREATE TABLE ranking (
+	idp INT PRIMARY KEY,
+	nicknamep VARCHAR(50) NOT NULL,
+	pontos VARCHAR(50) NOT NULL
+);

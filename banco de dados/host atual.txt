@@ -1,0 +1,13 @@
+000webhost
+guuhdeker.hsk@gmail.com "Entrar com o google"
+FTP: files.000webhost.com
+Porta: 21
+Nome de usuário: dekership
+Senha: 8038375Gg?
+
+Banco:
+$host = "localhost";
+$user = "id17775253_deker";
+$senha = "UD3suK)u[d9siHv@";
+$database = "id17775253_dekership";
+

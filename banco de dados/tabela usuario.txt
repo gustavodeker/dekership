@@ -1,0 +1,7 @@
+CREATE TABLE usuario(
+i_id_usuario INT PRIMARY KEY AUTO_INCREMENT,
+v_nome_usuario VARCHAR(50) NOT NULL UNIQUE,
+v_usuario_usuario VARCHAR(20) NOT NULL,
+v_senha_usuario VARCHAR (20) NOT NULL);
+
+insert into usuario values (DEFAULT,'Gustavo Bruno dos Santos','GustavoS','2019Gbs');

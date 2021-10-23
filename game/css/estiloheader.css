@@ -1,0 +1,115 @@
+/* rgb(50, 50, 139); */
+*{
+    margin: 0px;
+    padding: 0px;
+}
+.menu{
+    width: 100%;
+    height: 30px;
+    background-color: #55f;
+    font-family: 'Arial';
+}
+.menu ul{
+    list-style: none;
+    position: relative;
+}
+.menu ul li{
+    width: auto;
+    margin: 0px 10px 0px 0px;
+    float: left;
+}
+.menu a{
+    padding: 5px;
+    display: block;
+    text-decoration: none;
+    text-align: center;
+    background-color: #55f;
+    color: white;
+}
+
+/*SUBMENU*/
+.menu ul ul{
+    position: absolute;
+    visibility: hidden;
+}
+.menu ul li:hover ul{
+    visibility: visible;
+}
+.menu a:hover{
+    background-color: rgb(78, 78, 155);
+    transition-duration: 0.5s;
+}
+.menu ul ul li{
+    float: none;
+    /*border-bottom: solid 1px white;*/
+}
+.menu ul ul li a{
+    background-color: rgba(255, 255, 255, 0.8);
+    color: #55f;
+    border-radius: 5px;
+    margin: 1px;
+}
+.menu ul ul li a:hover{
+    background-color: rgb(238, 238, 248);
+}
+/*BOTÃO MENU*/
+label[for="bt-menu"]{
+    padding: 1px;
+    background-color: #55f;
+    color: white;
+    font-family: 'Arial';
+    text-align: center;
+    font-size: 28px;
+    cursor: pointer;
+    width: 100%;
+    height: 40px;
+}
+#bt-menu{
+    display:none;
+}
+label[for="bt-menu"]{
+    display: none;
+    text-align: left;
+    padding-left: 20px;
+}
+
+@media(max-width: 800px){
+    label[for="bt-menu"]{
+    display: inline-block;
+    }
+    /*label[for="bt-menu"]{
+    margin-bottom: -31px;
+    }*/
+    #bt-menu:checked ~ .menu{
+        margin-left: 0;
+    }
+    .menu{
+        margin-top: 0px;
+        margin-left: -100%;
+        transition: all 0.4s;
+    }
+    .menu ul li{
+        width: 100%;
+        float: none;
+    }
+    .menu ul ul{
+        position: static;
+        overflow: hidden;
+        max-height: 0;
+        transition: all 0.4s;
+    }
+    .menu ul li:hover ul{
+        height: auto;
+        max-height: 300px;
+    }
+}
+
+
+
+
+
+
+
+
+
+
