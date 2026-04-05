@@ -10,6 +10,8 @@
 - Obstaculos bloqueiam projeteis (cobertura).
 - Cada acerto no oponente soma 1 hit.
 - Vence quem atingir 3 hits primeiro.
+- Hitbox de acerto entre nave e projetil e circular.
+- Hitbox da nave e do projetil sao configuradas separadamente.
 
 ## Inicio e fim
 - Estado `waiting`: sala com 0 ou 1 jogador.

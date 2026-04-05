@@ -41,8 +41,10 @@ server/
 - Timeout de reconexao por jogador (10s).
 - Persistencia no fim da partida em transacao unica.
 - Leitura periodica de `projectile_speed` e `movement_speed` sem reiniciar processo.
+- Leitura periodica de `player_hitbox_radius` e `projectile_hitbox_radius` sem reiniciar processo.
 - Bootstrap automatico de `game_settings` e `game_admin` no startup.
 - Estado da partida inclui obstaculos fixos para cobertura e bloqueio de rota.
+- Deteccao de hit de projetil usa distancia circular com correcao de aspecto visual.
 
 ## Endpoints HTTP auxiliares
 - `GET /health` para monitoramento.

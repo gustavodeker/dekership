@@ -117,7 +117,10 @@ function ensure_admin_schema(): void
     db()->exec(
         "INSERT INTO game_settings (setting_key, setting_value) VALUES
         ('projectile_speed', '1.6'),
-        ('movement_speed', '3.0')
+        ('movement_speed', '3.0'),
+        ('render_smoothing', '0.25'),
+        ('player_hitbox_radius', '5.4'),
+        ('projectile_hitbox_radius', '0.6')
         ON DUPLICATE KEY UPDATE setting_value = setting_value"
     );
 

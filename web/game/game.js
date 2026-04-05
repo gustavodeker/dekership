@@ -24,6 +24,8 @@ let matchStarted = false;
 let startCountdownInterval = null;
 let startOverlayTimeout = null;
 let controlsLocked = false;
+let playerHitRadius = 5.4;
+let projectileHitRadius = 0.6;
 
 function applyCanvasScale() {
   const panel = canvas.closest('.game-panel');
@@ -123,6 +125,12 @@ async function fetchSession() {
   if (typeof data.render_smoothing === 'number') {
     renderSmoothing = Math.max(0, Math.min(1, data.render_smoothing));
   }
+  if (typeof data.player_hitbox_radius === 'number') {
+    playerHitRadius = Math.max(0.1, data.player_hitbox_radius);
+  }
+  if (typeof data.projectile_hitbox_radius === 'number') {
+    projectileHitRadius = Math.max(0.1, data.projectile_hitbox_radius);
+  }
   return data;
 }
 
@@ -165,6 +173,10 @@ function arenaToCanvasY(y) {
 
 function lerp(from, to, alpha) {
   return from + (to - from) * alpha;
+}
+
+function arenaRadiusToCanvasRadius(radius) {
+  return Math.min(arenaToCanvasX(radius), arenaToCanvasY(radius));
 }
 
 function cloneGameState(snapshot) {
@@ -270,6 +282,14 @@ function drawPlayer(player, color) {
   context.fill();
   context.restore();
 
+  context.save();
+  context.strokeStyle = 'rgba(34, 197, 94, 0.7)';
+  context.lineWidth = 2;
+  context.beginPath();
+  context.arc(x, y, arenaRadiusToCanvasRadius(playerHitRadius), 0, Math.PI * 2);
+  context.stroke();
+  context.restore();
+
   if (player.username) {
     context.save();
     context.font = '600 14px Arial';
@@ -285,10 +305,20 @@ function drawPlayer(player, color) {
 }
 
 function drawProjectile(projectile) {
+  const x = arenaToCanvasX(projectile.x);
+  const y = arenaToCanvasY(projectile.y);
   context.fillStyle = '#f59e0b';
   context.beginPath();
-  context.arc(arenaToCanvasX(projectile.x), arenaToCanvasY(projectile.y), 4, 0, Math.PI * 2);
+  context.arc(x, y, 4, 0, Math.PI * 2);
   context.fill();
+
+  context.save();
+  context.strokeStyle = 'rgba(245, 158, 11, 0.9)';
+  context.lineWidth = 1.5;
+  context.beginPath();
+  context.arc(x, y, arenaRadiusToCanvasRadius(projectileHitRadius), 0, Math.PI * 2);
+  context.stroke();
+  context.restore();
 }
 
 function drawObstacle(obstacle) {

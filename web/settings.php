@@ -14,8 +14,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $projectileSpeed = (float) ($_POST['projectile_speed'] ?? 1.6);
             $movementSpeed = (float) ($_POST['movement_speed'] ?? 3.0);
             $renderSmoothing = (float) ($_POST['render_smoothing'] ?? 0.25);
+            $playerHitboxRadius = (float) ($_POST['player_hitbox_radius'] ?? 5.4);
+            $projectileHitboxRadius = (float) ($_POST['projectile_hitbox_radius'] ?? 0.6);
 
-            if ($projectileSpeed <= 0 || $movementSpeed <= 0 || $renderSmoothing < 0 || $renderSmoothing > 1) {
+            if (
+                $projectileSpeed <= 0
+                || $movementSpeed <= 0
+                || $renderSmoothing < 0
+                || $renderSmoothing > 1
+                || $playerHitboxRadius <= 0
+                || $projectileHitboxRadius <= 0
+            ) {
                 throw new RuntimeException('Valores invalidos');
             }
 
@@ -27,6 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute(['setting_key' => 'projectile_speed', 'setting_value' => (string) $projectileSpeed]);
             $stmt->execute(['setting_key' => 'movement_speed', 'setting_value' => (string) $movementSpeed]);
             $stmt->execute(['setting_key' => 'render_smoothing', 'setting_value' => (string) $renderSmoothing]);
+            $stmt->execute(['setting_key' => 'player_hitbox_radius', 'setting_value' => (string) $playerHitboxRadius]);
+            $stmt->execute(['setting_key' => 'projectile_hitbox_radius', 'setting_value' => (string) $projectileHitboxRadius]);
             $success = 'Configuracoes salvas';
         }
 
@@ -103,6 +114,14 @@ render_header('Configuracoes');
             <label>
                 <span>Suavizacao visual (0-1)</span>
                 <input type="number" step="0.01" min="0" max="1" name="render_smoothing" value="<?= htmlspecialchars((string) ($settings['render_smoothing'] ?? '0.25'), ENT_QUOTES, 'UTF-8') ?>" required>
+            </label>
+            <label>
+                <span>Hitbox da nave</span>
+                <input type="number" step="0.1" min="0.1" name="player_hitbox_radius" value="<?= htmlspecialchars((string) ($settings['player_hitbox_radius'] ?? '5.4'), ENT_QUOTES, 'UTF-8') ?>" required>
+            </label>
+            <label>
+                <span>Hitbox do projetil</span>
+                <input type="number" step="0.1" min="0.1" name="projectile_hitbox_radius" value="<?= htmlspecialchars((string) ($settings['projectile_hitbox_radius'] ?? '0.6'), ENT_QUOTES, 'UTF-8') ?>" required>
             </label>
             <button type="submit" name="save_settings" value="1">Salvar</button>
         </form>

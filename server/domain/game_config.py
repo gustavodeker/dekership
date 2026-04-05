@@ -43,7 +43,9 @@ class GameConfigService:
                     VALUES
                       ('projectile_speed', '1.6'),
                       ('movement_speed', '3.0'),
-                      ('render_smoothing', '0.25')
+                      ('render_smoothing', '0.25'),
+                      ('player_hitbox_radius', '5.4'),
+                      ('projectile_hitbox_radius', '0.6')
                     ON DUPLICATE KEY UPDATE setting_value = setting_value
                     """
                 )
@@ -69,4 +71,6 @@ class GameConfigService:
             "projectile_speed": float(self._cache.get("projectile_speed", "1.6")),
             "movement_speed": float(self._cache.get("movement_speed", "3.0")),
             "render_smoothing": float(self._cache.get("render_smoothing", "0.25")),
+            "player_hitbox_radius": float(self._cache.get("player_hitbox_radius", "5.4")),
+            "projectile_hitbox_radius": float(self._cache.get("projectile_hitbox_radius", "0.6")),
         }

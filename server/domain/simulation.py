@@ -31,9 +31,8 @@ class SimulationService:
         self.arena_max_x = 100.0
         self.arena_min_y = 0.0
         self.arena_max_y = 100.0
-        self.hit_distance = 6.0
         self.player_collision_radius = 2.8
-        self.projectile_collision_radius = 0.6
+        self.visual_x_axis_factor = 768.0 / 1366.0
 
     async def start(self, match: MatchState) -> None:
         match.task = asyncio.create_task(self._run(match))
@@ -112,16 +111,21 @@ class SimulationService:
                     match.next_projectile_id += 1
 
     async def _advance_projectiles(self, room, match: MatchState) -> None:
+        game_settings = await self.game_config.get_settings()
+        player_hitbox_radius = game_settings["player_hitbox_radius"]
+        projectile_hitbox_radius = game_settings["projectile_hitbox_radius"]
+        hit_distance = player_hitbox_radius + projectile_hitbox_radius
+
         active: list[Projectile] = []
         for projectile in match.projectiles:
             projectile.x += projectile.velocity_x
             projectile.y += projectile.velocity_y
             if projectile.x < 0 or projectile.x > 100 or projectile.y < 0 or projectile.y > 100:
                 continue
-            if self._collides_with_obstacle(projectile.x, projectile.y, self.projectile_collision_radius, match):
+            if self._collides_with_obstacle_visual(projectile.x, projectile.y, projectile_hitbox_radius, match):
                 continue
             target = next(player for player in match.players.values() if player.user_id != projectile.owner_user_id)
-            if math.hypot(projectile.x - target.x, projectile.y - target.y) <= self.hit_distance:
+            if self._visual_distance(projectile.x, projectile.y, target.x, target.y) <= hit_distance:
                 attacker = match.players[projectile.owner_user_id]
                 attacker.hits += 1
                 await self.connection_manager.broadcast_hit(room, match, attacker.user_id, target.user_id)
@@ -138,6 +142,19 @@ class SimulationService:
             closest_x = max(obstacle.x, min(x, obstacle.x + obstacle.width))
             closest_y = max(obstacle.y, min(y, obstacle.y + obstacle.height))
             if math.hypot(x - closest_x, y - closest_y) <= radius:
+                return True
+        return False
+
+    def _visual_distance(self, x1: float, y1: float, x2: float, y2: float) -> float:
+        dx = (x1 - x2) / self.visual_x_axis_factor
+        dy = y1 - y2
+        return math.hypot(dx, dy)
+
+    def _collides_with_obstacle_visual(self, x: float, y: float, radius: float, match: MatchState) -> bool:
+        for obstacle in match.obstacles:
+            closest_x = max(obstacle.x, min(x, obstacle.x + obstacle.width))
+            closest_y = max(obstacle.y, min(y, obstacle.y + obstacle.height))
+            if self._visual_distance(x, y, closest_x, closest_y) <= radius:
                 return True
         return False
 
