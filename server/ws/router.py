@@ -1,209 +1,162 @@
-import json
-from typing import Any
+from __future__ import annotations
+
+import time
+from collections import deque
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from pydantic import ValidationError
 
-from ..auth import validate_php_session_token
-from ..config import settings
-from ..domain.matches import MatchService
-from ..domain.ranking import RankingService
-from ..domain.rooms import RoomService
-from .connection_manager import ConnectionManager
-
-router = APIRouter()
-
-room_service = RoomService()
-ranking_service = RankingService()
-manager = ConnectionManager()
+from server.auth import AuthUser, get_user_by_token
+from server.config import settings
+from server.domain.matches import MatchRegistry
+from server.domain.rooms import RoomRegistry, persist_room_created, persist_room_started
+from server.domain.simulation import SimulationService
+from server.models import AuthPayload, Envelope, PlayerInputPayload, RoomCreatePayload, RoomJoinPayload
+from server.ws.connection_manager import ConnectionManager
 
 
-async def _send_to_user(user_id: int, envelope: dict[str, Any]) -> None:
-    ws = manager.get_websocket_by_user(user_id)
-    if ws is None:
-        return
-    try:
-        await ws.send_json(envelope)
-    except Exception:
-        manager.disconnect(ws)
+class RateLimiter:
+    def __init__(self, limit: int) -> None:
+        self.limit = limit
+        self.entries: dict[int, deque[float]] = {}
+
+    def allow(self, key: int) -> bool:
+        now = time.time()
+        bucket = self.entries.setdefault(key, deque())
+        while bucket and now - bucket[0] > 1:
+            bucket.popleft()
+        if len(bucket) >= self.limit:
+            return False
+        bucket.append(now)
+        return True
 
 
-async def _broadcast(user_ids: list[int], envelope: dict[str, Any]) -> None:
-    for user_id in user_ids:
-        await _send_to_user(user_id, envelope)
+def build_ws_router(
+    rooms: RoomRegistry,
+    matches: MatchRegistry,
+    simulation: SimulationService,
+    manager: ConnectionManager,
+    input_rate_limit: int,
+) -> APIRouter:
+    router = APIRouter()
+    limiter = RateLimiter(input_rate_limit)
 
+    @router.websocket("/ws")
+    async def websocket_endpoint(websocket: WebSocket) -> None:
+        await websocket.accept()
+        authed_user: AuthUser | None = None
+        try:
+            while True:
+                raw = await websocket.receive_json()
+                envelope = Envelope.model_validate(raw)
 
-match_service = MatchService(
-    ranking_service=ranking_service,
-    tick_rate=settings.ws_tick_rate,
-    reconnect_timeout_seconds=settings.reconnect_timeout_seconds,
-    send_to_user=_send_to_user,
-    broadcast=_broadcast,
-)
-
-
-def _err(code: str, message: str) -> dict[str, Any]:
-    return {"event": "error", "payload": {"code": code, "message": message}}
-
-
-@router.websocket("/ws")
-async def ws_endpoint(websocket: WebSocket) -> None:
-    await manager.connect(websocket)
-    ctx = None
-    try:
-        while True:
-            try:
-                raw = await websocket.receive_text()
-            except (WebSocketDisconnect, RuntimeError):
-                break
-            try:
-                envelope = json.loads(raw)
-            except json.JSONDecodeError:
-                await websocket.send_json(_err("INVALID_PAYLOAD", "JSON invalido"))
-                continue
-
-            event = envelope.get("event")
-            payload = envelope.get("payload") or {}
-
-            if event == "auth":
-                token = str(payload.get("token") or "")
-                if not token:
-                    print("[ws auth] token ausente")
-                    await websocket.send_json(_err("UNAUTHORIZED", "token ausente"))
-                    continue
-                auth_user = await validate_php_session_token(token)
-                if auth_user is None:
-                    print(f"[ws auth] token invalido prefix={token[:10]}")
-                    await websocket.send_json(_err("UNAUTHORIZED", "token invalido"))
-                    continue
-                print(f"[ws auth] ok user_id={auth_user.user_id} user={auth_user.username} token_prefix={token[:10]}")
-
-                manager.register_identity(websocket, auth_user.user_id, auth_user.username)
-                room = await room_service.find_room_by_player(auth_user.user_id)
-                if room:
-                    match = match_service.get_match_by_room(room.room_id)
-                    if match:
-                        await match_service.mark_reconnected(match, auth_user.user_id)
-
-                await websocket.send_json(
-                    {
-                        "event": "auth_ok",
-                        "payload": {"user_id": auth_user.user_id, "username": auth_user.username},
-                    }
-                )
-                continue
-
-            ctx = manager.get_ctx(websocket)
-            if not ctx or ctx.user_id is None or ctx.username is None:
-                await websocket.send_json(_err("UNAUTHORIZED", "auth obrigatorio"))
-                continue
-
-            if event == "room_create":
-                room_name = str(payload.get("room_name") or "Sala")[:80]
-                room = await room_service.create_room(room_name, ctx.user_id)
-                player = await room_service.join_room(room, ctx.user_id, ctx.username)
-                print(f"[room_create] room={room.room_id} by={ctx.user_id}")
-                await websocket.send_json(
-                    {
-                        "event": "room_created",
-                        "payload": {"room_id": room.room_id, "status": room.status},
-                    }
-                )
-                await websocket.send_json(
-                    {
-                        "event": "room_joined",
-                        "payload": {"room_id": room.room_id, "side": player.side, "players": len(room.players)},
-                    }
-                )
-                continue
-
-            if event == "room_list":
-                rooms = await room_service.list_open_rooms()
-                await websocket.send_json(
-                    {
-                        "event": "room_list_result",
-                        "payload": {
-                            "rooms": [
-                                {
-                                    "room_id": r.room_id,
-                                    "name": r.name,
-                                    "players": len(r.players),
-                                }
-                                for r in rooms
-                            ]
-                        },
-                    }
-                )
-                continue
-
-            if event == "room_join":
-                room_id = str(payload.get("room_id") or "")
-                room = await room_service.get_room(room_id)
-                if room is None:
-                    await websocket.send_json(_err("INVALID_STATE", "sala nao encontrada"))
-                    continue
-                try:
-                    player = await room_service.join_room(room, ctx.user_id, ctx.username)
-                    print(f"[room_join] room={room.room_id} user={ctx.user_id} players={len(room.players)} status={room.status}")
-                except ValueError as exc:
-                    await websocket.send_json(_err(str(exc), "falha ao entrar"))
-                    continue
-
-                await websocket.send_json(
-                    {
-                        "event": "room_joined",
-                        "payload": {"room_id": room.room_id, "side": player.side, "players": len(room.players)},
-                    }
-                )
-
-                if room.status == "playing":
-                    match = match_service.get_match_by_room(room.room_id)
-                    if match:
-                        await websocket.send_json(
-                            {
-                                "event": "match_start",
-                                "payload": match_service.get_match_payload(match),
-                            }
+                if envelope.event == "auth":
+                    payload = AuthPayload.model_validate(envelope.payload)
+                    authed_user = await get_user_by_token(payload.token)
+                    if authed_user is None:
+                        await manager.send_error(websocket, "UNAUTHORIZED", "token invalido")
+                        continue
+                    manager.bind_user(authed_user.user_id, websocket)
+                    room = await rooms.attach_existing_connection(authed_user.user_id, websocket)
+                    await manager.send_json(
+                        websocket,
+                        "auth_ok",
+                        {"user_id": authed_user.user_id, "username": authed_user.username},
+                    )
+                    if room is not None:
+                        player = room.players[authed_user.user_id]
+                        await manager.send_json(
+                            websocket,
+                            "room_joined",
+                            {"room_id": room.room_id, "side": player.side, "players": len(room.players)},
                         )
+                        if room.status == "playing" and room.match_id is not None:
+                            match = await matches.get_by_room(room.room_id)
+                            if match is not None:
+                                await manager.send_json(
+                                    websocket,
+                                    "match_start",
+                                    {"match_id": match.match_id, "tick_rate": settings.ws_tick_rate},
+                                )
+                    await manager.send_json(websocket, "room_list_result", {"rooms": await rooms.list_rooms()})
                     continue
 
-                if len(room.players) == 2:
-                    await room_service.set_room_playing(room)
-                    match = await match_service.maybe_start_match(room)
-                    if match:
-                        print(f"[match_start] match={match.match_id} room={room.room_id}")
-                continue
-
-            if event == "player_input":
-                if not manager.allow_input(websocket, settings.input_rate_limit_per_second):
-                    await websocket.send_json(_err("RATE_LIMIT", "maximo de inputs por segundo excedido"))
+                if authed_user is None:
+                    await manager.send_error(websocket, "UNAUTHORIZED", "autenticacao obrigatoria")
                     continue
 
-                room = await room_service.find_room_by_player(ctx.user_id)
-                if room is None:
-                    await websocket.send_json(_err("INVALID_STATE", "usuario sem sala"))
+                if envelope.event == "player_input" and not limiter.allow(authed_user.user_id):
+                    await manager.send_error(websocket, "RATE_LIMIT", "limite de input excedido")
                     continue
 
-                match = match_service.get_match_by_room(room.room_id)
-                if match is None:
-                    await websocket.send_json(_err("INVALID_STATE", "partida nao iniciada"))
+                if envelope.event == "room_list":
+                    await manager.send_json(websocket, "room_list_result", {"rooms": await rooms.list_rooms()})
                     continue
 
-                seq = int(payload.get("seq", 0))
-                move_x = int(payload.get("move_x", 0))
-                shoot = bool(payload.get("shoot", False))
-                await match_service.submit_input(match, ctx.user_id, seq, move_x, shoot)
-                continue
+                if envelope.event == "room_create":
+                    payload = RoomCreatePayload.model_validate(envelope.payload)
+                    room = await rooms.create_room(authed_user.user_id, payload.room_name.strip())
+                    await persist_room_created(room)
+                    await rooms.join_room(room.room_id, authed_user.user_id, authed_user.username, websocket)
+                    await manager.send_json(websocket, "room_created", {"room_id": room.room_id, "status": room.status})
+                    await manager.send_json(websocket, "room_joined", {"room_id": room.room_id, "side": "bottom", "players": 1})
+                    await manager.broadcast_room_list(await rooms.list_rooms())
+                    continue
 
-            if event == "ping":
-                await websocket.send_json({"event": "pong", "payload": {"ts": payload.get("ts")}})
-                continue
+                if envelope.event == "room_join":
+                    payload = RoomJoinPayload.model_validate(envelope.payload)
+                    try:
+                        room, player, is_new = await rooms.join_room(
+                            payload.room_id,
+                            authed_user.user_id,
+                            authed_user.username,
+                            websocket,
+                        )
+                    except ValueError as exc:
+                        await manager.send_error(websocket, str(exc), "falha ao entrar")
+                        continue
+                    await manager.send_json(
+                        websocket,
+                        "room_joined",
+                        {"room_id": room.room_id, "side": player.side, "players": len(room.players)},
+                    )
+                    if is_new and len(room.players) == 2:
+                        await persist_room_started(room)
+                        match = await matches.start_match(room, room.room_db_id)
+                        await manager.broadcast(
+                            room,
+                            "match_start",
+                            {"match_id": match.match_id, "tick_rate": settings.ws_tick_rate},
+                        )
+                        await simulation.start(match)
+                    await manager.broadcast_room_list(await rooms.list_rooms())
+                    continue
 
-            await websocket.send_json(_err("INVALID_STATE", "evento nao suportado"))
-    finally:
-        ctx = manager.disconnect(websocket)
-        if ctx and ctx.user_id is not None:
-            room = await room_service.find_room_by_player(ctx.user_id)
-            if room:
-                match = match_service.get_match_by_room(room.room_id)
-                if match:
-                    await match_service.mark_disconnected(match, ctx.user_id)
+                if envelope.event == "player_input":
+                    payload = PlayerInputPayload.model_validate(envelope.payload)
+                    room = await rooms.get_room_for_user(authed_user.user_id)
+                    if room is None or authed_user.user_id not in room.players:
+                        await manager.send_error(websocket, "INVALID_STATE", "jogador sem sala")
+                        continue
+                    player = room.players[authed_user.user_id]
+                    if payload.seq <= player.input_seq:
+                        continue
+                    player.input_seq = payload.seq
+                    player.move_x = payload.move_x
+                    player.shoot_requested = payload.shoot
+                    continue
+
+                if envelope.event == "ping":
+                    await manager.send_json(websocket, "pong", envelope.payload)
+                    continue
+
+                await manager.send_error(websocket, "INVALID_STATE", "evento desconhecido")
+        except WebSocketDisconnect:
+            if authed_user is not None:
+                manager.unbind_user(authed_user.user_id, websocket)
+                await rooms.mark_disconnected(authed_user.user_id)
+                await manager.broadcast_room_list(await rooms.list_rooms())
+        except ValidationError:
+            await manager.send_error(websocket, "INVALID_STATE", "payload invalido")
+
+    return router

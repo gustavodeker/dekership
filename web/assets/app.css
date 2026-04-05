@@ -1,0 +1,164 @@
+:root {
+  --bg: #0e1726;
+  --panel: #132034;
+  --line: #2d4568;
+  --text: #edf4ff;
+  --muted: #93aac8;
+  --accent: #f59e0b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top, #19304e 0, var(--bg) 55%);
+  color: var(--text);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #111827;
+  padding: 0.8rem 1rem;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.8rem 0.9rem;
+  background: #0d1725;
+  color: var(--text);
+}
+
+.layout {
+  min-height: 100vh;
+}
+
+.topbar,
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.topbar {
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(9, 15, 25, 0.7);
+}
+
+.brand {
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.nav,
+.hud {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: var(--muted);
+}
+
+.content {
+  padding: 1.5rem;
+}
+
+.panel {
+  background: linear-gradient(180deg, rgba(27, 45, 72, 0.9), rgba(19, 32, 52, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 1.25rem;
+}
+
+.narrow {
+  max-width: 420px;
+  margin: 4rem auto 0;
+}
+
+.grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.stack {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.between {
+  justify-content: space-between;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.alert {
+  margin-bottom: 1rem;
+  color: #fff;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+
+.success {
+  margin-bottom: 1rem;
+  color: #fff;
+  background: rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+
+.room-card,
+.stats div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  background: rgba(10, 18, 31, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+#game-canvas {
+  width: 100%;
+  max-width: 900px;
+  background: linear-gradient(180deg, #09111d, #102338);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+}

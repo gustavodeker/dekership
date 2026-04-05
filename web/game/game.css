@@ -1,9 +1,0 @@
-#gameCanvas {
-  width: 100%;
-  max-width: 900px;
-  height: auto;
-  margin-top: 12px;
-  border: 1px solid #2d3b56;
-  border-radius: 8px;
-  background: #0d1628;
-}

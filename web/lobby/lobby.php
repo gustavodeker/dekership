@@ -1,51 +1,35 @@
 <?php
-include 'config/auth.php';
-sessionVerif();
-$token = $_SESSION['TOKEN'];
-$wsUrl = wsUrl();
-?>
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dekership - Lobby</title>
-    <link rel="stylesheet" href="web/assets/tailwind.css">
-    <link rel="stylesheet" href="web/lobby/lobby.css">
-</head>
-<body>
-<?php include 'header.php'; ?>
-<div class="container">
-    <div class="card">
-        <h2>Lobby 1v1</h2>
-        <div class="row">
-            <input id="roomName" class="input" type="text" maxlength="80" placeholder="Nome da sala">
-            <button id="createRoomBtn" class="btn" type="button">Criar sala</button>
-            <button id="refreshBtn" class="btn" type="button">Atualizar salas</button>
-        </div>
-        <p id="statusText">Conectando...</p>
-    </div>
 
-    <div class="card" style="margin-top: 12px;">
-        <h3>Salas abertas</h3>
-        <table class="table" id="roomsTable">
-            <thead>
-            <tr>
-                <th>Sala</th>
-                <th>Jogadores</th>
-                <th>Ação</th>
-            </tr>
-            </thead>
-            <tbody id="roomsBody"></tbody>
-        </table>
+declare(strict_types=1);
+
+$user = require_auth();
+render_header('Lobby');
+?>
+<section class="grid">
+    <div class="panel">
+        <h1>Lobby</h1>
+        <form id="create-room-form" class="stack">
+            <label>
+                <span>Nova sala</span>
+                <input type="text" id="room-name" maxlength="80" required>
+            </label>
+            <button type="submit">Criar sala</button>
+        </form>
     </div>
-</div>
+    <div class="panel">
+        <div class="row between">
+            <h2>Salas abertas</h2>
+            <span class="muted">Tempo real</span>
+        </div>
+        <div id="lobby-status" class="muted">Conectando...</div>
+        <div id="room-list" class="stack"></div>
+    </div>
+</section>
 <script>
-window.DEKERSHIP_CFG = {
-    token: <?= json_encode($token) ?>,
-    wsUrl: <?= json_encode($wsUrl) ?>
-};
+window.DK_SESSION = <?= json_encode([
+    'user' => $user,
+    'sessionEndpoint' => '/web/api/session.php',
+], JSON_UNESCAPED_SLASHES) ?>;
 </script>
-<script src="web/lobby/lobby.js"></script>
-</body>
-</html>
+<script src="/web/lobby/lobby.js"></script>
+<?php render_footer(); ?>

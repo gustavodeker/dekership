@@ -1,24 +1,11 @@
-from typing import Any, Literal
+from __future__ import annotations
 
-from pydantic import BaseModel, Field
-
-
-ClientEventName = Literal["auth", "room_create", "room_list", "room_join", "player_input", "ping"]
+from typing import Any
 
 
-class Envelope(BaseModel):
-    event: str
-    request_id: str | None = None
-    payload: dict[str, Any] = Field(default_factory=dict)
-
-
-class PlayerInputPayload(BaseModel):
-    seq: int
-    move_x: int = 0
-    shoot: bool = False
-
-
-class OutgoingEnvelope(BaseModel):
-    event: str
-    request_id: str | None = None
-    payload: dict[str, Any] = Field(default_factory=dict)
+def make_event(event: str, payload: dict[str, Any], request_id: str | None = None) -> dict[str, Any]:
+    return {
+        "event": event,
+        "request_id": request_id,
+        "payload": payload,
+    }

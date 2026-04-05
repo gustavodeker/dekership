@@ -14,10 +14,14 @@
   - Vitorias, derrotas, desconexoes
 - Ranking:
   - Lista ordenada por vitorias
+- Configuracoes:
+  - Visivel apenas para admin
+  - Ajuste de velocidade de projetil e movimento
+  - Controle de privilegio admin por usuario
 
 ## Fluxo no cliente
 1. Abrir WS e enviar `auth`.
-2. Solicitar `room_list`.
+2. Receber `room_list_result` automaticamente ao conectar.
 3. Criar ou entrar em sala.
 4. Receber `match_start`.
 5. Durante `playing`, enviar `player_input`.
@@ -33,9 +37,9 @@ web/game/game.php
 web/game/game.js
 web/profile/profile.php
 web/ranking/ranking.php
+web/settings.php
 ```
 
 ## Integracao Tailwind
-- Compilar CSS do Tailwind para arquivo estatico unico.
-- Evitar CDN em producao.
-- Definir componentes utilitarios para cards de sala, tabela e HUD.
+- CSS estatico unico em `web/assets/app.css`.
+- Lista de salas atualizada em tempo real via WS.

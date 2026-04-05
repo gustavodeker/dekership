@@ -11,6 +11,8 @@
 - Concluido: inicio automatico ao segundo jogador entrar.
 - Concluido: loop de jogo e regra de 3 hits.
 - Concluido: persistencia de resultado no banco.
+- Concluido: push automatico da lista de salas.
+- Concluido: leitura dinamica de configuracoes de gameplay.
 
 ## Fase 3 - PHP/Frontend
 - Concluido: lobby com criar sala e lista de salas.
@@ -18,12 +20,16 @@
 - Concluido: perfil com `wins/losses/disconnects`.
 - Concluido: ranking lendo `player_stats`.
 - Concluido: redirecionamento dos entrypoints legados para o fluxo novo.
+- Concluido: cadastro PHP.
+- Concluido: tela administrativa de configuracoes e privilegios.
 
 ## Fase 4 - Validacao
 - Em andamento: teste com 2 clientes simultaneos em rede local.
 - Pendente: validar desconexao no meio da partida.
 - Pendente: validar concorrencia de criacao/entrada de salas com repeticao.
 - Pendente: validar atualizacao de ranking apos varias partidas.
+- Pendente: validar alteracao de `projectile_speed` e `movement_speed` com novas partidas.
+- Pendente: validar promocao/rebaixamento de admin.
 
 ## Criterios de aceite
 - Sala inicia automaticamente com 2 jogadores.

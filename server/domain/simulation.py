@@ -1,108 +1,124 @@
-from dataclasses import dataclass, field
-from typing import Literal
+from __future__ import annotations
+
+import asyncio
+import logging
+from datetime import datetime, timezone
+
+from server.config import settings
+from server.domain.game_config import GameConfigService
+from server.domain.matches import MatchRegistry, MatchState, Projectile
+from server.domain.rooms import RoomRegistry, persist_room_closed
+from server.ws.connection_manager import ConnectionManager
+
+logger = logging.getLogger(__name__)
 
 
-@dataclass
-class PlayerInput:
-    seq: int = 0
-    move_x: int = 0
-    shoot: bool = False
-
-
-@dataclass
-class PlayerState:
-    x: float
-    y: float
-    shoot_cooldown_ticks: int = 0
-
-
-@dataclass
-class Projectile:
-    owner_user_id: int
-    x: float
-    y: float
-    direction: Literal[-1, 1]
-
-
-@dataclass
-class SimulationSnapshot:
-    tick: int
-    p1: dict[str, float]
-    p2: dict[str, float]
-    projectiles: list[dict[str, float | int]]
-    score: dict[str, int]
-
-
-@dataclass
-class MatchSimulationState:
-    tick: int = 0
-    width: float = 100.0
-    p_bottom: PlayerState = field(default_factory=lambda: PlayerState(x=50.0, y=90.0))
-    p_top: PlayerState = field(default_factory=lambda: PlayerState(x=50.0, y=10.0))
-    projectiles: list[Projectile] = field(default_factory=list)
-
-
-class SimulationEngine:
-    def __init__(self) -> None:
-        self.player_speed = 2.5
-        self.projectile_speed = 3.0
-        self.shoot_cooldown_ticks = 6
-        self.hit_distance_x = 6.0
-        self.hit_distance_y = 5.0
-
-    def step(
+class SimulationService:
+    def __init__(
         self,
-        state: MatchSimulationState,
-        bottom_user_id: int,
-        top_user_id: int,
-        bottom_input: PlayerInput,
-        top_input: PlayerInput,
-    ) -> tuple[SimulationSnapshot, list[tuple[int, int]]]:
-        state.tick += 1
+        room_registry: RoomRegistry,
+        match_registry: MatchRegistry,
+        connection_manager: ConnectionManager,
+        game_config: GameConfigService,
+    ) -> None:
+        self.room_registry = room_registry
+        self.match_registry = match_registry
+        self.connection_manager = connection_manager
+        self.game_config = game_config
+        self.tick_interval = 1 / settings.ws_tick_rate
+        self.arena_min_x = 0.0
+        self.arena_max_x = 100.0
+        self.bottom_y = 92.0
+        self.top_y = 8.0
+        self.hit_distance = 8.0
 
-        self._apply_input(state.p_bottom, bottom_input)
-        self._apply_input(state.p_top, top_input)
+    async def start(self, match: MatchState) -> None:
+        match.task = asyncio.create_task(self._run(match))
 
-        if bottom_input.shoot and state.p_bottom.shoot_cooldown_ticks == 0:
-            state.projectiles.append(Projectile(owner_user_id=bottom_user_id, x=state.p_bottom.x, y=state.p_bottom.y - 3, direction=-1))
-            state.p_bottom.shoot_cooldown_ticks = self.shoot_cooldown_ticks
+    async def _run(self, match: MatchState) -> None:
+        try:
+            while match.status == "playing":
+                await asyncio.sleep(self.tick_interval)
+                match.tick += 1
+                room = await self.room_registry.get_room(match.room_id)
+                if room is None:
+                    break
+                await self._apply_inputs(room, match)
+                await self._advance_projectiles(room, match)
+                disconnected = self._disconnected_timeout_user(room)
+                if disconnected is not None:
+                    winner = next(user_id for user_id in match.players if user_id != disconnected)
+                    await self._finish(match, winner, disconnected, "disconnect", disconnected)
+                    break
+                await self.connection_manager.broadcast_state(room, match)
+        except Exception:
+            logger.exception("simulation_loop_failed", extra={"match_id": match.match_id, "room_id": match.room_id})
+            raise
 
-        if top_input.shoot and state.p_top.shoot_cooldown_ticks == 0:
-            state.projectiles.append(Projectile(owner_user_id=top_user_id, x=state.p_top.x, y=state.p_top.y + 3, direction=1))
-            state.p_top.shoot_cooldown_ticks = self.shoot_cooldown_ticks
+    async def _apply_inputs(self, room, match: MatchState) -> None:
+        game_settings = await self.game_config.get_settings()
+        movement_speed = game_settings["movement_speed"]
+        for player_state in room.players.values():
+            match_player = match.players[player_state.user_id]
+            match_player.x = max(
+                self.arena_min_x,
+                min(self.arena_max_x, match_player.x + (player_state.move_x * movement_speed)),
+            )
+            if player_state.shoot_requested:
+                player_state.shoot_requested = False
+                if (match.tick - match_player.last_shot_tick) >= 6:
+                    match_player.last_shot_tick = match.tick
+                    match.projectiles.append(
+                        Projectile(
+                            owner_user_id=match_player.user_id,
+                            x=match_player.x,
+                            y=self.bottom_y if match_player.side == "bottom" else self.top_y,
+                            direction=-1 if match_player.side == "bottom" else 1,
+                            speed=game_settings["projectile_speed"],
+                        )
+                    )
 
-        if state.p_bottom.shoot_cooldown_ticks > 0:
-            state.p_bottom.shoot_cooldown_ticks -= 1
-        if state.p_top.shoot_cooldown_ticks > 0:
-            state.p_top.shoot_cooldown_ticks -= 1
-
-        hits: list[tuple[int, int]] = []
-        alive_projectiles: list[Projectile] = []
-        for projectile in state.projectiles:
-            projectile.y += self.projectile_speed * projectile.direction
+    async def _advance_projectiles(self, room, match: MatchState) -> None:
+        active: list[Projectile] = []
+        for projectile in match.projectiles:
+            projectile.y += projectile.direction * projectile.speed
             if projectile.y < 0 or projectile.y > 100:
                 continue
-
-            target = state.p_top if projectile.owner_user_id == bottom_user_id else state.p_bottom
-            target_user_id = top_user_id if projectile.owner_user_id == bottom_user_id else bottom_user_id
-            if abs(projectile.x - target.x) <= self.hit_distance_x and abs(projectile.y - target.y) <= self.hit_distance_y:
-                hits.append((projectile.owner_user_id, target_user_id))
+            target = next(player for player in match.players.values() if player.user_id != projectile.owner_user_id)
+            target_y = self.top_y if target.side == "top" else self.bottom_y
+            if abs(projectile.y - target_y) <= projectile.speed and abs(projectile.x - target.x) <= self.hit_distance:
+                attacker = match.players[projectile.owner_user_id]
+                attacker.hits += 1
+                await self.connection_manager.broadcast_hit(room, match, attacker.user_id, target.user_id)
+                if attacker.hits >= 3:
+                    await self._finish(match, attacker.user_id, target.user_id, "3_hits")
+                    return
                 continue
+            active.append(projectile)
+        match.projectiles = active
 
-            alive_projectiles.append(projectile)
+    def _disconnected_timeout_user(self, room) -> int | None:
+        now = datetime.now(timezone.utc)
+        for player in room.players.values():
+            if not player.connected and player.disconnect_started_at is not None:
+                if (now - player.disconnect_started_at).total_seconds() >= settings.reconnect_timeout_seconds:
+                    return player.user_id
+        return None
 
-        state.projectiles = alive_projectiles
-
-        snapshot = SimulationSnapshot(
-            tick=state.tick,
-            p1={"x": state.p_bottom.x, "y": state.p_bottom.y},
-            p2={"x": state.p_top.x, "y": state.p_top.y},
-            projectiles=[{"owner_user_id": p.owner_user_id, "x": p.x, "y": p.y} for p in state.projectiles],
-            score={"p1": 0, "p2": 0},
-        )
-        return snapshot, hits
-
-    def _apply_input(self, player: PlayerState, player_input: PlayerInput) -> None:
-        move_x = max(-1, min(1, player_input.move_x))
-        player.x += self.player_speed * move_x
-        player.x = max(0.0, min(100.0, player.x))
+    async def _finish(
+        self,
+        match: MatchState,
+        winner_user_id: int,
+        loser_user_id: int,
+        reason: str,
+        disconnected_user_id: int | None = None,
+    ) -> None:
+        await self.match_registry.finish_match(match, winner_user_id, loser_user_id, reason, disconnected_user_id)
+        room = await self.room_registry.get_room(match.room_id)
+        if room is not None:
+            room.status = "finished"
+            await self.connection_manager.broadcast_match_end(room, match)
+            await self.room_registry.close_room(room.room_id)
+            await persist_room_closed(room)
+            await self.room_registry.remove_room(room.room_id)
+        await self.match_registry.remove_match(match.match_id)

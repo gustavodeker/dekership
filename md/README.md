@@ -11,9 +11,11 @@
 - [08-plano-implementacao.md](08-plano-implementacao.md)
 - [09-sequencia-execucao.md](09-sequencia-execucao.md)
 - [10-operacao-e-debug.md](10-operacao-e-debug.md)
+- [11-admin-configuracoes.md](11-admin-configuracoes.md)
 
 ## Objetivo
 - Transformar o projeto atual em jogo online 1v1 com lobby de salas.
 - Manter autenticacao atual em PHP.
 - Rodar servidor de partida em Python WebSocket.
 - Persistir resultados e ranking no MariaDB.
+- Permitir configuracao administrativa de gameplay e administradores.

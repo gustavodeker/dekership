@@ -1,151 +1,102 @@
-(function () {
-  const cfg = window.DEKERSHIP_CFG;
-  let ws;
-  let sessionToken = cfg.token;
-  let allowReconnect = true;
+const statusEl = document.getElementById('lobby-status');
+const roomListEl = document.getElementById('room-list');
+const createRoomForm = document.getElementById('create-room-form');
+const roomNameEl = document.getElementById('room-name');
 
-  const statusText = document.getElementById("statusText");
-  const roomNameInput = document.getElementById("roomName");
-  const roomsBody = document.getElementById("roomsBody");
+let ws;
+let requestId = 0;
 
-  function send(event, payload) {
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      return;
-    }
-    ws.send(JSON.stringify({ event, payload: payload || {} }));
+async function fetchSession() {
+  const response = await fetch(window.DK_SESSION.sessionEndpoint, { credentials: 'same-origin' });
+  const data = await response.json();
+  if (!data.ok) {
+    window.location.href = '/index.php?page=login';
+    return null;
+  }
+  return data;
+}
+
+function send(event, payload = {}) {
+  ws.send(JSON.stringify({ event, payload, request_id: String(++requestId) }));
+}
+
+function renderRooms(rooms) {
+  roomListEl.innerHTML = '';
+  if (!rooms.length) {
+    roomListEl.innerHTML = '<div class="muted">Nenhuma sala aberta</div>';
+    return;
   }
 
-  function setStatus(text) {
-    statusText.textContent = text;
-  }
+  rooms.forEach((room) => {
+    const card = document.createElement('div');
+    card.className = 'room-card';
+    card.innerHTML = `
+      <div>
+        <strong>${room.name}</strong>
+        <div class="muted">${room.players}/2 jogadores</div>
+      </div>
+      <button type="button">Entrar</button>
+    `;
+    card.querySelector('button').addEventListener('click', () => {
+      send('room_join', { room_id: room.room_id });
+    });
+    roomListEl.appendChild(card);
+  });
+}
 
-  function navigate(url) {
-    allowReconnect = false;
-    if (ws) {
-      ws.close();
-    }
-    window.location.href = url;
-  }
+async function connect() {
+  const session = await fetchSession();
+  if (!session) return;
 
-  function renderRooms(rooms) {
-    roomsBody.innerHTML = "";
-    if (!rooms.length) {
-      roomsBody.innerHTML = '<tr><td colspan="3">Nenhuma sala aberta.</td></tr>';
-      return;
-    }
-
-    for (const room of rooms) {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${room.name}</td>
-        <td>${room.players}/2</td>
-        <td><button class="btn" data-room-id="${room.room_id}">Entrar</button></td>
-      `;
-      roomsBody.appendChild(tr);
-    }
-  }
-
-  function connect() {
-    ws = new WebSocket(cfg.wsUrl);
-
-    ws.onopen = () => {
-      setStatus("Conectado. Autenticando...");
-      send("auth", { token: sessionToken });
-    };
-
-    ws.onmessage = (ev) => {
-      const msg = JSON.parse(ev.data);
-      if (msg.event === "auth_ok") {
-        setStatus(`Autenticado: ${msg.payload.username}`);
-        send("room_list", {});
-      }
-
-      if (msg.event === "room_created") {
-        localStorage.setItem("dk_room_id", msg.payload.room_id);
-      }
-
-      if (msg.event === "room_joined") {
-        localStorage.setItem("dk_room_id", msg.payload.room_id);
-        if (msg.payload.players < 2) {
-          setStatus("Aguardando segundo jogador...");
-        } else {
-          setStatus("Partida iniciando...");
-        }
-      }
-
-      if (msg.event === "room_list_result") {
-        renderRooms(msg.payload.rooms || []);
-      }
-
-      if (msg.event === "match_start") {
-        localStorage.setItem("dk_match_id", msg.payload.match_id);
-        navigate("index.php?page=game");
-      }
-
-      if (msg.event === "error") {
-        const message = msg.payload && msg.payload.message ? `: ${msg.payload.message}` : "";
-        setStatus(`Erro: ${msg.payload.code}${message}`);
-      }
-    };
-
-    ws.onclose = () => {
-      if (!allowReconnect) {
-        return;
-      }
-      setStatus("Conexao fechada. Reconectando...");
-      setTimeout(async () => {
-        if (!allowReconnect) {
-          return;
-        }
-        try {
-          await refreshSessionToken();
-          connect();
-        } catch {
-          setStatus("Erro: sessao invalida");
-        }
-      }, 1000);
-    };
-  }
-
-  async function refreshSessionToken() {
-    const res = await fetch("web/api/session.php", { credentials: "same-origin", cache: "no-store" });
-    if (!res.ok) {
-      throw new Error("session fetch failed");
-    }
-    const data = await res.json();
-    if (!data || !data.ok || !data.token) {
-      throw new Error("session token missing");
-    }
-    sessionToken = data.token;
-  }
-
-  document.getElementById("createRoomBtn").addEventListener("click", () => {
-    const roomName = roomNameInput.value.trim() || "Sala 1";
-    send("room_create", { room_name: roomName });
+  ws = new WebSocket(session.ws_url);
+  ws.addEventListener('open', () => {
+    statusEl.textContent = 'Autenticando...';
+    send('auth', { token: session.token });
   });
 
-  document.getElementById("refreshBtn").addEventListener("click", () => {
-    send("room_list", {});
-  });
+  ws.addEventListener('message', (message) => {
+    const data = JSON.parse(message.data);
+    const { event, payload } = data;
 
-  roomsBody.addEventListener("click", (ev) => {
-    const target = ev.target;
-    if (!(target instanceof HTMLButtonElement)) {
+    if (event === 'auth_ok') {
+      statusEl.textContent = `Conectado como ${payload.username}`;
       return;
     }
-    const roomId = target.dataset.roomId;
-    if (!roomId) {
+
+    if (event === 'room_list_result') {
+      renderRooms(payload.rooms);
       return;
     }
-    send("room_join", { room_id: roomId });
-  });
 
-  window.addEventListener("beforeunload", () => {
-    allowReconnect = false;
-    if (ws) {
-      ws.close();
+    if (event === 'room_created' || event === 'room_joined') {
+      localStorage.setItem('dk_room_id', payload.room_id);
+      statusEl.textContent = 'Sala pronta';
+      send('room_list');
+      return;
+    }
+
+    if (event === 'match_start') {
+      localStorage.setItem('dk_match_id', payload.match_id);
+      window.location.href = '/index.php?page=game';
+      return;
+    }
+
+    if (event === 'error') {
+      statusEl.textContent = `${payload.code}: ${payload.message}`;
     }
   });
 
-  refreshSessionToken().then(connect).catch(() => setStatus("Erro: sessao invalida"));
-})();
+  ws.addEventListener('close', () => {
+    statusEl.textContent = 'Conexão encerrada';
+  });
+}
+
+createRoomForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const roomName = roomNameEl.value.trim();
+  if (!roomName) return;
+  send('room_create', { room_name: roomName });
+  roomNameEl.value = '';
+});
+
+connect();

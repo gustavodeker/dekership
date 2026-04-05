@@ -1,108 +1,222 @@
+from __future__ import annotations
+
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Literal
+from datetime import datetime, timezone
+from typing import Any
 from uuid import uuid4
 
-from ..db import get_conn
+from server.db import get_pool
 
 
-RoomStatus = Literal["waiting", "playing", "closed"]
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
-@dataclass
-class RoomPlayer:
+@dataclass(slots=True)
+class PlayerState:
     user_id: int
     username: str
-    side: Literal["bottom", "top"]
+    side: str
+    websocket: Any | None = None
+    connected: bool = False
+    input_seq: int = -1
+    move_x: int = 0
+    shoot_requested: bool = False
+    disconnect_started_at: datetime | None = None
 
 
-@dataclass
-class Room:
+@dataclass(slots=True)
+class RoomState:
     room_id: str
     name: str
+    status: str
     created_by_user_id: int
-    status: RoomStatus = "waiting"
-    players: dict[int, RoomPlayer] = field(default_factory=dict)
+    created_at: datetime
+    room_db_id: int | None = None
+    players: dict[int, PlayerState] = field(default_factory=dict)
+    match_id: str | None = None
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
-    db_id: int | None = None
 
 
-class RoomService:
+class RoomRegistry:
     def __init__(self) -> None:
-        self._rooms: dict[str, Room] = {}
-        self._lock = asyncio.Lock()
+        self.rooms: dict[str, RoomState] = {}
+        self.room_ids_by_user: dict[int, str] = {}
+        self.lock = asyncio.Lock()
 
-    async def create_room(self, room_name: str, creator_user_id: int) -> Room:
-        room = Room(room_id=str(uuid4()), name=room_name, created_by_user_id=creator_user_id)
-        async with self._lock:
-            self._rooms[room.room_id] = room
-        await self._persist_room(room)
-        return room
+    async def list_rooms(self) -> list[dict[str, Any]]:
+        async with self.lock:
+            return self._list_rooms_unlocked()
 
-    async def list_open_rooms(self) -> list[Room]:
-        async with self._lock:
-            return [r for r in self._rooms.values() if r.status == "waiting" and len(r.players) < 2]
+    async def get_room(self, room_id: str) -> RoomState | None:
+        async with self.lock:
+            return self.rooms.get(room_id)
 
-    async def get_room(self, room_id: str) -> Room | None:
-        async with self._lock:
-            return self._rooms.get(room_id)
+    async def get_room_for_user(self, user_id: int) -> RoomState | None:
+        async with self.lock:
+            room_id = self.room_ids_by_user.get(user_id)
+            if room_id is None:
+                return None
+            return self.rooms.get(room_id)
 
-    async def find_room_by_player(self, user_id: int) -> Room | None:
-        async with self._lock:
-            for room in self._rooms.values():
-                if user_id in room.players:
-                    return room
-        return None
+    def _list_rooms_unlocked(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "room_id": room.room_id,
+                "name": room.name,
+                "players": len(room.players),
+                "status": room.status,
+            }
+            for room in self.rooms.values()
+            if room.status == "waiting" and len(room.players) < 2
+        ]
 
-    async def join_room(self, room: Room, user_id: int, username: str) -> RoomPlayer:
-        async with room.lock:
-            if user_id in room.players:
-                return room.players[user_id]
-            if room.status != "waiting":
+    async def create_room(self, created_by_user_id: int, room_name: str) -> RoomState:
+        async with self.lock:
+            room_id = str(uuid4())
+            room = RoomState(
+                room_id=room_id,
+                name=room_name,
+                status="waiting",
+                created_by_user_id=created_by_user_id,
+                created_at=utcnow(),
+            )
+            self.rooms[room_id] = room
+            return room
+
+    async def join_room(
+        self,
+        room_id: str,
+        user_id: int,
+        username: str,
+        websocket: Any,
+    ) -> tuple[RoomState, PlayerState, bool]:
+        async with self.lock:
+            if user_id in self.room_ids_by_user:
+                current_room = self.rooms.get(self.room_ids_by_user[user_id])
+                if current_room and current_room.room_id == room_id:
+                    player = current_room.players[user_id]
+                    player.websocket = websocket
+                    player.connected = True
+                    player.disconnect_started_at = None
+                    return current_room, player, False
                 raise ValueError("INVALID_STATE")
+
+            room = self.rooms.get(room_id)
+            if room is None:
+                raise ValueError("ROOM_NOT_FOUND")
             if len(room.players) >= 2:
                 raise ValueError("ROOM_FULL")
-
-            side: Literal["bottom", "top"] = "bottom" if len(room.players) == 0 else "top"
-            player = RoomPlayer(user_id=user_id, username=username, side=side)
+            side = "bottom" if not room.players else "top"
+            player = PlayerState(
+                user_id=user_id,
+                username=username,
+                side=side,
+                websocket=websocket,
+                connected=True,
+            )
             room.players[user_id] = player
-            return player
+            self.room_ids_by_user[user_id] = room_id
+            return room, player, True
 
-    async def set_room_playing(self, room: Room) -> None:
-        async with room.lock:
-            room.status = "playing"
-        await self._update_room_status(room, "playing", started_at=True)
+    async def attach_existing_connection(self, user_id: int, websocket: Any) -> RoomState | None:
+        async with self.lock:
+            room_id = self.room_ids_by_user.get(user_id)
+            if room_id is None:
+                return None
+            room = self.rooms.get(room_id)
+            if room is None:
+                return None
+            player = room.players.get(user_id)
+            if player is None:
+                return None
+            player.websocket = websocket
+            player.connected = True
+            player.disconnect_started_at = None
+            return room
 
-    async def close_room(self, room: Room) -> None:
-        async with room.lock:
+    async def mark_disconnected(self, user_id: int) -> RoomState | None:
+        async with self.lock:
+            room_id = self.room_ids_by_user.get(user_id)
+            if room_id is None:
+                return None
+            room = self.rooms.get(room_id)
+            if room is None:
+                return None
+            player = room.players.get(user_id)
+            if player is None:
+                return None
+            player.connected = False
+            player.websocket = None
+            player.disconnect_started_at = utcnow()
+            return room
+
+    async def close_room(self, room_id: str) -> None:
+        async with self.lock:
+            room = self.rooms.get(room_id)
+            if room is None:
+                return
             room.status = "closed"
-        await self._update_room_status(room, "closed", closed_at=True)
 
-    async def _persist_room(self, room: Room) -> None:
-        query = (
-            "INSERT INTO game_room (room_uuid, name, status, created_by_user_id, created_at) "
-            "VALUES (%s, %s, %s, %s, %s)"
-        )
-        async with get_conn() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(query, (room.room_id, room.name, room.status, room.created_by_user_id, datetime.utcnow()))
-                room.db_id = int(cur.lastrowid)
-            await conn.commit()
+    async def remove_room(self, room_id: str) -> None:
+        async with self.lock:
+            room = self.rooms.pop(room_id, None)
+            if room is None:
+                return
+            for user_id in room.players:
+                self.room_ids_by_user.pop(user_id, None)
 
-    async def _update_room_status(self, room: Room, status: str, started_at: bool = False, closed_at: bool = False) -> None:
-        set_parts = ["status = %s"]
-        params: list[object] = [status]
-        if started_at:
-            set_parts.append("started_at = %s")
-            params.append(datetime.utcnow())
-        if closed_at:
-            set_parts.append("closed_at = %s")
-            params.append(datetime.utcnow())
 
-        params.append(room.room_id)
-        query = f"UPDATE game_room SET {', '.join(set_parts)} WHERE room_uuid = %s"
-        async with get_conn() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(query, tuple(params))
-            await conn.commit()
+async def persist_room_created(room: RoomState) -> None:
+    pool = get_pool()
+    async with pool.acquire() as connection:
+        async with connection.cursor() as cursor:
+            await cursor.execute(
+                """
+                INSERT INTO game_room (room_uuid, name, status, created_by_user_id, created_at)
+                VALUES (%s, %s, 'waiting', %s, %s)
+                """,
+                (
+                    room.room_id,
+                    room.name,
+                    room.created_by_user_id,
+                    room.created_at.replace(tzinfo=None),
+                ),
+            )
+            room.room_db_id = int(cursor.lastrowid)
+            await connection.commit()
+
+
+async def persist_room_started(room: RoomState) -> None:
+    if room.room_db_id is None:
+        return
+    pool = get_pool()
+    async with pool.acquire() as connection:
+        async with connection.cursor() as cursor:
+            await cursor.execute(
+                """
+                UPDATE game_room
+                SET status = 'playing', started_at = UTC_TIMESTAMP()
+                WHERE id = %s
+                """,
+                (room.room_db_id,),
+            )
+            await connection.commit()
+
+
+async def persist_room_closed(room: RoomState) -> None:
+    if room.room_db_id is None:
+        return
+    pool = get_pool()
+    async with pool.acquire() as connection:
+        async with connection.cursor() as cursor:
+            await cursor.execute(
+                """
+                UPDATE game_room
+                SET status = 'closed', closed_at = UTC_TIMESTAMP()
+                WHERE id = %s
+                """,
+                (room.room_db_id,),
+            )
+            await connection.commit()

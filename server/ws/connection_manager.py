@@ -1,52 +1,117 @@
-from collections import defaultdict, deque
-from dataclasses import dataclass
-from time import monotonic
+from __future__ import annotations
+
+from typing import Any
 
 from fastapi import WebSocket
 
-
-@dataclass
-class ConnectionCtx:
-    websocket: WebSocket
-    user_id: int | None = None
-    username: str | None = None
+from server.domain.matches import MatchState
+from server.domain.rooms import RoomState
+from server.ws.events import make_event
 
 
 class ConnectionManager:
     def __init__(self) -> None:
-        self._ctx_by_ws: dict[WebSocket, ConnectionCtx] = {}
-        self._ws_by_user: dict[int, WebSocket] = {}
-        self._input_windows: dict[WebSocket, deque[float]] = defaultdict(deque)
+        self.connections_by_user: dict[int, WebSocket] = {}
 
-    async def connect(self, websocket: WebSocket) -> None:
-        await websocket.accept()
-        self._ctx_by_ws[websocket] = ConnectionCtx(websocket=websocket)
+    def bind_user(self, user_id: int, websocket: WebSocket) -> None:
+        self.connections_by_user[user_id] = websocket
 
-    def register_identity(self, websocket: WebSocket, user_id: int, username: str) -> None:
-        ctx = self._ctx_by_ws[websocket]
-        ctx.user_id = user_id
-        ctx.username = username
-        self._ws_by_user[user_id] = websocket
+    def unbind_user(self, user_id: int, websocket: WebSocket | None = None) -> None:
+        current = self.connections_by_user.get(user_id)
+        if current is None:
+            return
+        if websocket is not None and current is not websocket:
+            return
+        self.connections_by_user.pop(user_id, None)
 
-    def get_ctx(self, websocket: WebSocket) -> ConnectionCtx | None:
-        return self._ctx_by_ws.get(websocket)
+    async def send_json(self, websocket: WebSocket | None, event: str, payload: dict[str, Any]) -> None:
+        if websocket is None:
+            return
+        try:
+            await websocket.send_json(make_event(event, payload))
+        except Exception:
+            return
 
-    def get_websocket_by_user(self, user_id: int) -> WebSocket | None:
-        return self._ws_by_user.get(user_id)
+    async def send_error(self, websocket: WebSocket, code: str, message: str) -> None:
+        try:
+            await websocket.send_json(make_event("error", {"code": code, "message": message}))
+        except Exception:
+            return
 
-    def allow_input(self, websocket: WebSocket, max_per_second: int) -> bool:
-        now = monotonic()
-        window = self._input_windows[websocket]
-        while window and now - window[0] > 1.0:
-            window.popleft()
-        if len(window) >= max_per_second:
-            return False
-        window.append(now)
-        return True
+    async def broadcast(self, room: RoomState, event: str, payload: dict[str, Any]) -> None:
+        for player in room.players.values():
+            if player.connected and player.websocket is not None:
+                try:
+                    await player.websocket.send_json(make_event(event, payload))
+                except Exception:
+                    player.connected = False
+                    player.websocket = None
 
-    def disconnect(self, websocket: WebSocket) -> ConnectionCtx | None:
-        ctx = self._ctx_by_ws.pop(websocket, None)
-        self._input_windows.pop(websocket, None)
-        if ctx and ctx.user_id is not None and self._ws_by_user.get(ctx.user_id) is websocket:
-            self._ws_by_user.pop(ctx.user_id, None)
-        return ctx
+    async def broadcast_state(self, room: RoomState, match: MatchState) -> None:
+        players = {player.side: player for player in match.players.values()}
+        await self.broadcast(
+            room,
+            "state",
+            {
+                "tick": match.tick,
+                "p1": {
+                    "user_id": players["bottom"].user_id,
+                    "username": players["bottom"].username,
+                    "x": players["bottom"].x,
+                    "side": "bottom",
+                },
+                "p2": {
+                    "user_id": players["top"].user_id,
+                    "username": players["top"].username,
+                    "x": players["top"].x,
+                    "side": "top",
+                },
+                "projectiles": [
+                    {
+                        "owner_user_id": projectile.owner_user_id,
+                        "x": projectile.x,
+                        "y": projectile.y,
+                    }
+                    for projectile in match.projectiles
+                ],
+                "score": {
+                    "p1": players["bottom"].hits,
+                    "p2": players["top"].hits,
+                },
+            },
+        )
+
+    async def broadcast_hit(self, room: RoomState, match: MatchState, attacker_id: int, target_id: int) -> None:
+        attacker = match.players[attacker_id]
+        target = match.players[target_id]
+        await self.broadcast(
+            room,
+            "hit",
+            {
+                "match_id": match.match_id,
+                "attacker": attacker_id,
+                "target": target_id,
+                "score": {
+                    "attacker": attacker.hits,
+                    "target": target.hits,
+                },
+            },
+        )
+
+    async def broadcast_match_end(self, room: RoomState, match: MatchState) -> None:
+        await self.broadcast(
+            room,
+            "match_end",
+            {
+                "match_id": match.match_id,
+                "winner_user_id": match.winner_user_id,
+                "reason": match.end_reason,
+            },
+        )
+
+    async def broadcast_room_list(self, rooms_payload: list[dict[str, Any]]) -> None:
+        for user_id, websocket in list(self.connections_by_user.items()):
+            try:
+                await websocket.send_json(make_event("room_list_result", {"rooms": rooms_payload}))
+            except Exception:
+                self.connections_by_user.pop(user_id, None)

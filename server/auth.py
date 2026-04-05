@@ -1,23 +1,27 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 
-from .db import get_conn
+from server.config import settings
+from server.db import fetch_one
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, frozen=True)
 class AuthUser:
     user_id: int
     username: str
 
 
-async def validate_php_session_token(token: str) -> AuthUser | None:
-    token = token.strip()
-    if not token:
+async def get_user_by_token(token: str) -> AuthUser | None:
+    query = f"""
+        SELECT
+            {settings.auth_id_column} AS user_id,
+            {settings.auth_display_column} AS username
+        FROM {settings.auth_user_table}
+        WHERE {settings.auth_token_column} = %s
+        LIMIT 1
+    """
+    row = await fetch_one(query, (token,))
+    if row is None:
         return None
-    query = "SELECT id, usuario FROM usuario WHERE token = %s LIMIT 1"
-    async with get_conn() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(query, (token,))
-            row = await cur.fetchone()
-    if not row:
-        return None
-    return AuthUser(user_id=int(row[0]), username=str(row[1]))
+    return AuthUser(user_id=int(row["user_id"]), username=str(row["username"]))

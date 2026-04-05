@@ -1,30 +1,21 @@
 <?php
-include 'config/auth.php';
-sessionVerif();
-global $usuario;
-$stats = userStats((int)$usuario['id']);
+
+declare(strict_types=1);
+
+$user = require_auth();
+$query = db()->prepare('SELECT wins, losses, disconnects FROM player_stats WHERE user_id = :user_id LIMIT 1');
+$query->execute(['user_id' => $user['user_id']]);
+$stats = $query->fetch() ?: ['wins' => 0, 'losses' => 0, 'disconnects' => 0];
+
+render_header('Perfil');
 ?>
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dekership - Perfil</title>
-    <link rel="stylesheet" href="web/assets/tailwind.css">
-    <link rel="stylesheet" href="web/profile/profile.css">
-</head>
-<body>
-<?php include 'header.php'; ?>
-<div class="container">
-    <div class="card">
-        <h2>Perfil</h2>
-        <p>Usu·rio: <strong><?= htmlspecialchars($usuario['usuario']) ?></strong></p>
-        <div class="row stats">
-            <div class="stat"><span>VitÛrias</span><strong><?= (int)$stats['wins'] ?></strong></div>
-            <div class="stat"><span>Derrotas</span><strong><?= (int)$stats['losses'] ?></strong></div>
-            <div class="stat"><span>Desconexıes</span><strong><?= (int)$stats['disconnects'] ?></strong></div>
-        </div>
+<section class="panel narrow">
+    <h1>Perfil</h1>
+    <div class="stats">
+        <div><span>Usu√°rio</span><strong><?= htmlspecialchars((string) $user['display_name'], ENT_QUOTES, 'UTF-8') ?></strong></div>
+        <div><span>Vit√≥rias</span><strong><?= (int) $stats['wins'] ?></strong></div>
+        <div><span>Derrotas</span><strong><?= (int) $stats['losses'] ?></strong></div>
+        <div><span>Desconex√µes</span><strong><?= (int) $stats['disconnects'] ?></strong></div>
     </div>
-</div>
-</body>
-</html>
+</section>
+<?php render_footer(); ?>

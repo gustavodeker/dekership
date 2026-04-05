@@ -23,6 +23,7 @@ server/
     matches.py
     simulation.py
     ranking.py
+    game_config.py
 ```
 
 ## Responsabilidades
@@ -31,6 +32,7 @@ server/
 - `matches.py`: iniciar partida com 2 jogadores e encerrar.
 - `simulation.py`: loop fixo, hit detection e regra de 3 acertos.
 - `ranking.py`: atualizar `player_stats` e consultas de ranking.
+- `game_config.py`: schema admin/config e leitura cacheada de `game_settings`.
 
 ## Regras tecnicas
 - Um processo async unico para estado em memoria local.
@@ -38,8 +40,11 @@ server/
 - Input rate-limit por conexao (ex.: max 30 msg/s).
 - Timeout de reconexao por jogador (10s).
 - Persistencia no fim da partida em transacao unica.
+- Leitura periodica de `projectile_speed` e `movement_speed` sem reiniciar processo.
+- Bootstrap automatico de `game_settings` e `game_admin` no startup.
 
 ## Endpoints HTTP auxiliares
 - `GET /health` para monitoramento.
 - `GET /rooms` opcional para debug.
 - `GET /ranking` opcional para tela web sem WS.
+- `GET /profile?token=<TOKEN>` para perfil por sessao PHP.

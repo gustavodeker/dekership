@@ -1,62 +1,44 @@
 <?php
-include 'config/auth.php';
-sessionVerif();
 
-function rankingRows(): array
-{
-    global $pdo;
-    $sql = $pdo->prepare(
-        'SELECT u.usuario, s.wins, s.losses, s.disconnects
-         FROM player_stats s
-         JOIN usuario u ON u.id = s.user_id
-         ORDER BY s.wins DESC, s.losses ASC
-         LIMIT 100'
-    );
-    $sql->execute();
-    return $sql->fetchAll();
-}
+declare(strict_types=1);
 
-$rows = rankingRows();
+$config = app_config();
+require_auth();
+$sql = sprintf(
+    'SELECT u.%s AS username, s.wins, s.losses, s.disconnects
+     FROM player_stats s
+     JOIN %s u ON u.%s = s.user_id
+     ORDER BY s.wins DESC, s.losses ASC
+     LIMIT 100',
+    $config['auth_display_column'],
+    $config['auth_user_table'],
+    $config['auth_id_column']
+);
+$items = db()->query($sql)->fetchAll();
+
+render_header('Ranking');
 ?>
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dekership - Ranking</title>
-    <link rel="stylesheet" href="web/assets/tailwind.css">
-    <link rel="stylesheet" href="web/ranking/ranking.css">
-</head>
-<body>
-<?php include 'header.php'; ?>
-<div class="container">
-    <div class="card">
-        <h2>Ranking 1v1</h2>
-        <table class="table">
-            <thead>
+<section class="panel">
+    <h1>Ranking</h1>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Usu√°rio</th>
+                <th>Vit√≥rias</th>
+                <th>Derrotas</th>
+                <th>Desconex√µes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($items as $item): ?>
                 <tr>
-                    <th>Jogador</th>
-                    <th>VitÛrias</th>
-                    <th>Derrotas</th>
-                    <th>Desconexıes</th>
+                    <td><?= htmlspecialchars((string) $item['username'], ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><?= (int) $item['wins'] ?></td>
+                    <td><?= (int) $item['losses'] ?></td>
+                    <td><?= (int) $item['disconnects'] ?></td>
                 </tr>
-            </thead>
-            <tbody>
-                <?php if (!$rows): ?>
-                    <tr><td colspan="4">Sem dados.</td></tr>
-                <?php else: ?>
-                    <?php foreach ($rows as $row): ?>
-                        <tr>
-                            <td><?= htmlspecialchars($row['usuario']) ?></td>
-                            <td><?= (int)$row['wins'] ?></td>
-                            <td><?= (int)$row['losses'] ?></td>
-                            <td><?= (int)$row['disconnects'] ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-</body>
-</html>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+</section>
+<?php render_footer(); ?>

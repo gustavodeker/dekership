@@ -1,21 +1,23 @@
 <?php
+
+declare(strict_types=1);
+
+require dirname(__DIR__) . '/bootstrap.php';
+
 header('Content-Type: application/json; charset=utf-8');
-header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-header('Pragma: no-cache');
 
-require_once __DIR__ . '/../../config/auth.php';
-sessionVerif();
+$user = current_user();
+if ($user === null) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'message' => 'unauthorized']);
+    exit;
+}
 
-global $usuario;
-$sessionToken = $_SESSION['TOKEN'] ?? '';
-$sessionUser = auth($sessionToken);
 echo json_encode([
     'ok' => true,
-    'token' => $sessionToken,
-    'username' => $usuario['usuario'] ?? '',
-    'user_id' => (int)($usuario['id'] ?? 0),
-    'token_prefix' => substr($sessionToken, 0, 10),
-    'token_valid_php' => $sessionUser ? true : false,
-    'db_host_php' => getenv('DB_HOST') ?: '',
-    'db_name_php' => getenv('DB_NAME') ?: '',
-]);
+    'user_id' => $user['user_id'],
+    'username' => $user['username'],
+    'display_name' => $user['display_name'],
+    'token' => $user['token'],
+    'ws_url' => app_config()['ws_url'],
+], JSON_UNESCAPED_SLASHES);

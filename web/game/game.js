@@ -1,226 +1,128 @@
-(function () {
-  const cfg = window.DEKERSHIP_GAME_CFG;
-  const statusText = document.getElementById("statusText");
-  const myScoreEl = document.getElementById("myScore");
-  const enemyScoreEl = document.getElementById("enemyScore");
-  const canvas = document.getElementById("gameCanvas");
-  const ctx = canvas.getContext("2d");
+const canvas = document.getElementById('game-canvas');
+const context = canvas.getContext('2d');
+const statusNode = document.getElementById('game-status');
+const scoreSelf = document.getElementById('score-self');
+const scoreOpponent = document.getElementById('score-opponent');
 
-  let ws;
-  let myUserId = null;
-  let sessionToken = cfg.token;
-  let seq = 0;
-  let moveX = 0;
-  let shootPressed = false;
-  let side = "bottom";
-  let state = null;
-  let matchStarted = false;
-  let allowReconnect = true;
+let ws;
+let requestId = 0;
+let inputSeq = 0;
+let myUserId = null;
+let state = null;
+const pressed = { left: false, right: false };
 
-  function setStatus(text) {
-    statusText.textContent = text;
+async function fetchSession() {
+  const response = await fetch(window.DK_SESSION.sessionEndpoint, { credentials: 'same-origin' });
+  const data = await response.json();
+  if (!data.ok) {
+    window.location.href = '/index.php?page=login';
+    return null;
+  }
+  myUserId = data.user_id;
+  return data;
+}
+
+function send(event, payload = {}) {
+  ws.send(JSON.stringify({ event, payload, request_id: String(++requestId) }));
+}
+
+function currentMoveX() {
+  if (pressed.left && !pressed.right) return -1;
+  if (pressed.right && !pressed.left) return 1;
+  return 0;
+}
+
+function sendInput(shoot = false) {
+  send('player_input', {
+    seq: ++inputSeq,
+    move_x: currentMoveX(),
+    shoot,
+  });
+}
+
+function drawPlayer(player, y, color) {
+  context.fillStyle = color;
+  context.fillRect(player.x * 8, y, 60, 16);
+}
+
+function drawProjectile(projectile) {
+  context.fillStyle = '#f59e0b';
+  context.fillRect(projectile.x * 8 + 28, projectile.y * 5, 4, 12);
+}
+
+function render() {
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = '#17324f';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (state) {
+    drawPlayer(state.p1, 470, state.p1.user_id === myUserId ? '#22c55e' : '#3b82f6');
+    drawPlayer(state.p2, 50, state.p2.user_id === myUserId ? '#22c55e' : '#ef4444');
+    state.projectiles.forEach(drawProjectile);
+    const selfIsBottom = state.p1.user_id === myUserId;
+    scoreSelf.textContent = selfIsBottom ? state.score.p1 : state.score.p2;
+    scoreOpponent.textContent = selfIsBottom ? state.score.p2 : state.score.p1;
   }
 
-  function send(event, payload) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ event, payload: payload || {} }));
-    }
-  }
+  requestAnimationFrame(render);
+}
 
-  function navigate(url) {
-    allowReconnect = false;
-    if (ws) {
-      ws.close();
-    }
-    window.location.href = url;
-  }
+async function connect() {
+  const session = await fetchSession();
+  if (!session) return;
 
-  function connect() {
-    ws = new WebSocket(cfg.wsUrl);
+  ws = new WebSocket(session.ws_url);
+  ws.addEventListener('open', () => send('auth', { token: session.token }));
 
-    ws.onopen = () => {
-      setStatus("Conectado. Autenticando...");
-      send("auth", { token: sessionToken });
-    };
+  ws.addEventListener('message', (message) => {
+    const data = JSON.parse(message.data);
+    const { event, payload } = data;
 
-    ws.onmessage = (ev) => {
-      const msg = JSON.parse(ev.data);
-
-      if (msg.event === "auth_ok") {
-        myUserId = msg.payload.user_id;
-        setStatus("Autenticado. Entrando na sala...");
-        if (cfg.roomId) {
-          send("room_join", { room_id: cfg.roomId });
-        } else {
-          setStatus("Sala nao definida. Volte ao lobby.");
-        }
-      }
-
-      if (msg.event === "room_joined") {
-        side = msg.payload.side;
-        cfg.roomId = msg.payload.room_id;
-        localStorage.setItem("dk_room_id", cfg.roomId);
-        setStatus(msg.payload.players < 2 ? "Aguardando segundo jogador..." : "Aguardando inicio da partida...");
-      }
-
-      if (msg.event === "match_start") {
-        cfg.matchId = msg.payload.match_id;
-        localStorage.setItem("dk_match_id", cfg.matchId);
-        matchStarted = true;
-        setStatus("Partida em andamento");
-      }
-
-      if (msg.event === "state") {
-        state = msg.payload;
-        const p1 = Number(state.score && state.score.p1 ? state.score.p1 : 0);
-        const p2 = Number(state.score && state.score.p2 ? state.score.p2 : 0);
-        if (side === "bottom") {
-          myScoreEl.textContent = String(p1);
-          enemyScoreEl.textContent = String(p2);
-        } else {
-          myScoreEl.textContent = String(p2);
-          enemyScoreEl.textContent = String(p1);
-        }
-      }
-
-      if (msg.event === "match_end") {
-        const winner = msg.payload.winner_user_id;
-        matchStarted = false;
-        setStatus(winner === myUserId ? "Vitoria" : "Derrota");
-        setTimeout(() => {
-          navigate("index.php?page=lobby");
-        }, 2000);
-      }
-
-      if (msg.event === "error") {
-        const code = msg.payload && msg.payload.code ? msg.payload.code : "UNKNOWN";
-        const message = msg.payload && msg.payload.message ? `: ${msg.payload.message}` : "";
-        if (code === "INVALID_STATE" && message.includes("partida nao iniciada") && !matchStarted) {
-          return;
-        }
-        if (code === "INVALID_STATE" && message.includes("sala nao encontrada")) {
-          setStatus("Sala invalida. Voltando ao lobby...");
-          setTimeout(() => {
-            navigate("index.php?page=lobby");
-          }, 800);
-          return;
-        }
-        setStatus(`Erro: ${code}${message}`);
-      }
-    };
-
-    ws.onclose = () => {
-      matchStarted = false;
-      if (!allowReconnect) {
-        return;
-      }
-      setStatus("Conexao encerrada. Reconectando...");
-      setTimeout(async () => {
-        if (!allowReconnect) {
-          return;
-        }
-        try {
-          await refreshSessionToken();
-          connect();
-        } catch {
-          setStatus("Erro: sessao invalida");
-        }
-      }, 1000);
-    };
-  }
-
-  async function refreshSessionToken() {
-    const res = await fetch("web/api/session.php", { credentials: "same-origin", cache: "no-store" });
-    if (!res.ok) {
-      throw new Error("session fetch failed");
-    }
-    const data = await res.json();
-    if (!data || !data.ok || !data.token) {
-      throw new Error("session token missing");
-    }
-    sessionToken = data.token;
-  }
-
-  function inputLoop() {
-    if (!matchStarted) {
-      return;
-    }
-    seq += 1;
-    send("player_input", { seq, move_x: moveX, shoot: shootPressed });
-    shootPressed = false;
-  }
-
-  function drawLoop() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#0d1628";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    if (!state) {
-      requestAnimationFrame(drawLoop);
+    if (event === 'auth_ok') {
+      statusNode.textContent = 'Conectado';
       return;
     }
 
-    const p1 = state.p1 || { x: 50, y: 90 };
-    const p2 = state.p2 || { x: 50, y: 10 };
-
-    const toX = (x) => (x / 100) * canvas.width;
-    const toY = (y) => (y / 100) * canvas.height;
-
-    ctx.fillStyle = "#2ea043";
-    ctx.fillRect(toX(p1.x) - 20, toY(p1.y) - 8, 40, 16);
-
-    ctx.fillStyle = "#e5534b";
-    ctx.fillRect(toX(p2.x) - 20, toY(p2.y) - 8, 40, 16);
-
-    const projectiles = Array.isArray(state.projectiles) ? state.projectiles : [];
-    ctx.fillStyle = "#f0c674";
-    for (const shot of projectiles) {
-      ctx.beginPath();
-      ctx.arc(toX(shot.x), toY(shot.y), 4, 0, Math.PI * 2);
-      ctx.fill();
+    if (event === 'match_start') {
+      localStorage.setItem('dk_match_id', payload.match_id);
+      statusNode.textContent = 'Partida iniciada';
+      return;
     }
 
-    requestAnimationFrame(drawLoop);
-  }
+    if (event === 'state') {
+      state = payload;
+      return;
+    }
 
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a") {
-      moveX = -1;
+    if (event === 'match_end') {
+      const won = Number(payload.winner_user_id) === Number(myUserId);
+      statusNode.textContent = won ? 'Vitória' : 'Derrota';
+      localStorage.removeItem('dk_room_id');
+      localStorage.removeItem('dk_match_id');
+      setTimeout(() => {
+        window.location.href = '/index.php?page=lobby';
+      }, 2000);
+      return;
     }
-    if (e.key === "ArrowRight" || e.key.toLowerCase() === "d") {
-      moveX = 1;
-    }
-    if (e.code === "Space") {
-      shootPressed = true;
+
+    if (event === 'error') {
+      statusNode.textContent = `${payload.code}: ${payload.message}`;
     }
   });
+}
 
-  document.addEventListener("keyup", (e) => {
-    if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a") {
-      if (moveX === -1) {
-        moveX = 0;
-      }
-    }
-    if (e.key === "ArrowRight" || e.key.toLowerCase() === "d") {
-      if (moveX === 1) {
-        moveX = 0;
-      }
-    }
-  });
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'ArrowLeft' || event.key.toLowerCase() === 'a') pressed.left = true;
+  if (event.key === 'ArrowRight' || event.key.toLowerCase() === 'd') pressed.right = true;
+  if (event.code === 'Space') sendInput(true);
+  else sendInput(false);
+});
 
-  document.getElementById("leaveBtn").addEventListener("click", () => {
-    navigate("index.php?page=lobby");
-  });
+window.addEventListener('keyup', (event) => {
+  if (event.key === 'ArrowLeft' || event.key.toLowerCase() === 'a') pressed.left = false;
+  if (event.key === 'ArrowRight' || event.key.toLowerCase() === 'd') pressed.right = false;
+  sendInput(false);
+});
 
-  window.addEventListener("beforeunload", () => {
-    allowReconnect = false;
-    if (ws) {
-      ws.close();
-    }
-  });
-
-  setInterval(() => send("ping", { ts: Date.now() }), 5000);
-  setInterval(inputLoop, 50);
-  drawLoop();
-  refreshSessionToken().then(connect).catch(() => setStatus("Erro: sessao invalida"));
-})();
+connect();
+render();
