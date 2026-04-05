@@ -238,3 +238,26 @@ body.game-page .game-panel {
   z-index: 5;
 }
 
+.game-start-overlay--end {
+  min-width: 420px;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 3.2rem;
+  line-height: 1.1;
+}
+
+.game-start-overlay__result {
+  font-size: 1em;
+  font-weight: 900;
+}
+
+.game-start-overlay__exit {
+  font-size: 0.45em;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.game-start-overlay__count {
+  color: #f59e0b;
+}
+

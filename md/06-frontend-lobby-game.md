@@ -14,6 +14,8 @@
   - HUD no header (`Partida`, status, `Voce` e `Oponente`)
   - Overlay central de inicio: `3`, `2`, `1`, `GO!` (GO por 1 segundo)
   - Input bloqueado ate fim do `GO!`
+  - Overlay central ao encerrar partida: `Vitoria!` ou `Derrota!` + `Saindo em 3... 2... 1...`
+  - Input bloqueado durante o countdown de saida
   - Countdown mostrado apenas 1 vez por `match_id` (nao repetir em recarregar/reconectar)
   - Movimento em 8 direcoes
   - Mira pelo mouse
@@ -43,7 +45,7 @@
    - Incluir render de `obstacles` e colisao visual com cobertura.
    - Interpolar nave e projetil entre snapshots.
    - Parear projetil por `projectile_id` (nao por indice).
-8. Ao `match_end`, mostrar resultado e voltar para lobby.
+8. Ao `match_end`, mostrar overlay de resultado com countdown de saida e voltar para lobby.
 9. Tratar `room_closed` para limpar estado local de sala (`dk_room_id`/`dk_match_id`) e atualizar lista.
 
 ## Controles do game

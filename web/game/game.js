@@ -23,6 +23,7 @@ let resizeHandle = null;
 let matchStarted = false;
 let startCountdownInterval = null;
 let startOverlayTimeout = null;
+let endCountdownInterval = null;
 let controlsLocked = false;
 let playerHitRadius = 5.4;
 let projectileHitRadius = 0.6;
@@ -65,11 +66,16 @@ function clearStartOverlayTimers() {
     clearTimeout(startOverlayTimeout);
     startOverlayTimeout = null;
   }
+  if (endCountdownInterval !== null) {
+    clearInterval(endCountdownInterval);
+    endCountdownInterval = null;
+  }
 }
 
 function hideStartOverlay() {
   if (!startOverlayNode) return;
   startOverlayNode.hidden = true;
+  startOverlayNode.classList.remove('game-start-overlay--end');
   startOverlayNode.textContent = '';
 }
 
@@ -78,6 +84,7 @@ function startMatchCountdown() {
   clearStartOverlayTimers();
   controlsLocked = true;
   pendingShot = false;
+  startOverlayNode.classList.remove('game-start-overlay--end');
 
   let count = 3;
   startOverlayNode.hidden = false;
@@ -97,6 +104,37 @@ function startMatchCountdown() {
       controlsLocked = false;
       startOverlayTimeout = null;
     }, 1000);
+  }, 1000);
+}
+
+function renderMatchEndOverlay(won, count) {
+  if (!startOverlayNode) return;
+  startOverlayNode.classList.add('game-start-overlay--end');
+  startOverlayNode.innerHTML = `
+    <div class="game-start-overlay__result">${won ? 'Vit\u00f3ria!' : 'Derrota!'}</div>
+    <div class="game-start-overlay__exit">Saindo em <span class="game-start-overlay__count">${count}</span>...</div>
+  `;
+}
+
+function startMatchEndCountdown(won) {
+  if (!startOverlayNode) return;
+  clearStartOverlayTimers();
+  controlsLocked = true;
+  pendingShot = false;
+  startOverlayNode.hidden = false;
+
+  let count = 3;
+  renderMatchEndOverlay(won, count);
+  endCountdownInterval = window.setInterval(() => {
+    count -= 1;
+    if (count >= 1) {
+      renderMatchEndOverlay(won, count);
+      return;
+    }
+    clearStartOverlayTimers();
+    localStorage.removeItem('dk_room_id');
+    localStorage.removeItem('dk_match_id');
+    window.location.href = '/index.php?page=lobby';
   }, 1000);
 }
 
@@ -408,15 +446,10 @@ async function connect() {
 
     if (event === 'match_end') {
       clearStartOverlayTimers();
-      controlsLocked = false;
       hideStartOverlay();
       const won = Number(payload.winner_user_id) === Number(myUserId);
-      statusNode.textContent = won ? 'Vitória' : 'Derrota';
-      localStorage.removeItem('dk_room_id');
-      localStorage.removeItem('dk_match_id');
-      setTimeout(() => {
-        window.location.href = '/index.php?page=lobby';
-      }, 2000);
+      statusNode.textContent = won ? 'Vit\u00f3ria' : 'Derrota';
+      startMatchEndCountdown(won);
       return;
     }
 
