@@ -1,0 +1,32 @@
+*{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+body {
+    overflow-x: hidden;
+    /* não mostrar barra de rolagem */
+    overflow-y: hidden;
+    /* não mostrar barra de rolagem */
+    background-color: rgb(240, 230, 220);
+}
+
+.main{
+    width: 100vw;
+    height: calc(100vh - 50px);
+    display: flex;
+    justify-content: center;
+    overflow: auto;
+}
+.div-tabela{
+    margin-top: 20px;
+    width: 600px;
+    height: max-content;
+    padding: 20px;
+    box-shadow: 0px 0px 20px rgba(100, 100, 100, 0.5);
+}
+#tabela-ranking{
+    display: block;
+    max-height: 600px;
+    overflow: auto;
+}
