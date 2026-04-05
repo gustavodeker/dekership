@@ -16,6 +16,7 @@
   - Mira pelo mouse
   - Disparo no clique esquerdo
   - Obstaculos renderizados no mapa para cover e rotas
+  - Nome dos dois jogadores renderizado acima da nave em tempo real
 - Perfil:
   - Vitorias, derrotas, desconexoes
 - Ranking:
@@ -43,6 +44,7 @@
 - Mouse: mirar
 - Clique esquerdo: atirar
 - Nave renderizada com rotacao em tempo real
+- Nome do jogador acompanha a nave em tempo real
 
 ## Organizacao de arquivos sugerida
 ```text

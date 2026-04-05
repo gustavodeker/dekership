@@ -141,6 +141,19 @@ function drawPlayer(player, color) {
   context.closePath();
   context.fill();
   context.restore();
+
+  if (player.username) {
+    context.save();
+    context.font = '600 14px Arial';
+    context.textAlign = 'center';
+    context.textBaseline = 'bottom';
+    context.lineWidth = 4;
+    context.strokeStyle = 'rgba(15, 23, 42, 0.9)';
+    context.fillStyle = '#f8fafc';
+    context.strokeText(player.username, x, y - 18);
+    context.fillText(player.username, x, y - 18);
+    context.restore();
+  }
 }
 
 function drawProjectile(projectile) {

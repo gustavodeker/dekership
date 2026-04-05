@@ -10,6 +10,7 @@
 - Mira: cursor do mouse
 - Tiro: clique esquerdo
 - Nave aponta em tempo real para o cursor
+- Nome de cada jogador aparece acima da nave em tempo real
 - Projetil segue a direcao da mira
 
 ## Subida local
