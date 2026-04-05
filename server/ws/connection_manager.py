@@ -82,6 +82,15 @@ class ConnectionManager:
                     }
                     for projectile in match.projectiles
                 ],
+                "obstacles": [
+                    {
+                        "x": obstacle.x,
+                        "y": obstacle.y,
+                        "width": obstacle.width,
+                        "height": obstacle.height,
+                    }
+                    for obstacle in match.obstacles
+                ],
                 "score": {
                     "p1": players["bottom"].hits,
                     "p2": players["top"].hits,

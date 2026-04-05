@@ -37,6 +37,14 @@ class Projectile:
 
 
 @dataclass(slots=True)
+class Obstacle:
+    x: float
+    y: float
+    width: float
+    height: float
+
+
+@dataclass(slots=True)
 class MatchState:
     match_id: str
     room_id: str
@@ -48,6 +56,7 @@ class MatchState:
     end_reason: str | None = None
     players: dict[int, MatchPlayer] = field(default_factory=dict)
     projectiles: list[Projectile] = field(default_factory=list)
+    obstacles: list[Obstacle] = field(default_factory=list)
     task: asyncio.Task | None = None
     started_at: datetime = field(default_factory=utcnow)
     finished_at: datetime | None = None
@@ -69,6 +78,11 @@ class MatchRegistry:
                 match_id=match_id,
                 room_id=room.room_id,
                 room_db_id=room_db_id,
+                obstacles=[
+                    Obstacle(x=44.0, y=35.0, width=12.0, height=30.0),
+                    Obstacle(x=20.0, y=45.0, width=10.0, height=14.0),
+                    Obstacle(x=70.0, y=45.0, width=10.0, height=14.0),
+                ],
                 players={
                     bottom.user_id: MatchPlayer(bottom.user_id, bottom.username, "bottom", 50.0, 82.0, 50.0, 0.0),
                     top.user_id: MatchPlayer(top.user_id, top.username, "top", 50.0, 18.0, 50.0, 100.0),

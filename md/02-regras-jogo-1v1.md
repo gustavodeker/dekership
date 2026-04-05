@@ -6,6 +6,8 @@
 - Nave sempre orientada pela posicao atual do cursor.
 - Disparo ocorre no clique esquerdo.
 - Projetil sai da posicao atual da nave e segue a direcao da mira.
+- Obstaculos fixos no mapa bloqueiam movimento da nave.
+- Obstaculos bloqueiam projeteis (cobertura).
 - Cada acerto no oponente soma 1 hit.
 - Vence quem atingir 3 hits primeiro.
 

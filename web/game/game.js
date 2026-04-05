@@ -116,12 +116,31 @@ function drawProjectile(projectile) {
   context.fill();
 }
 
+function drawObstacle(obstacle) {
+  context.fillStyle = '#334155';
+  context.fillRect(
+    arenaToCanvasX(obstacle.x),
+    arenaToCanvasY(obstacle.y),
+    arenaToCanvasX(obstacle.width),
+    arenaToCanvasY(obstacle.height)
+  );
+  context.strokeStyle = '#64748b';
+  context.lineWidth = 2;
+  context.strokeRect(
+    arenaToCanvasX(obstacle.x),
+    arenaToCanvasY(obstacle.y),
+    arenaToCanvasX(obstacle.width),
+    arenaToCanvasY(obstacle.height)
+  );
+}
+
 function render() {
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = '#17324f';
   context.fillRect(0, 0, canvas.width, canvas.height);
 
   if (state) {
+    (state.obstacles || []).forEach(drawObstacle);
     drawPlayer(state.p1, state.p1.user_id === myUserId ? '#22c55e' : '#3b82f6');
     drawPlayer(state.p2, state.p2.user_id === myUserId ? '#22c55e' : '#ef4444');
     state.projectiles.forEach(drawProjectile);

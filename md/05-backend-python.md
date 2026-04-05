@@ -30,7 +30,7 @@ server/
 - `auth.py`: validar token de sessao PHP contra tabela `usuario`.
 - `rooms.py`: criar/listar/entrar sala.
 - `matches.py`: iniciar partida com 2 jogadores e encerrar.
-- `simulation.py`: loop fixo, hit detection e regra de 3 acertos.
+- `simulation.py`: loop fixo, hit detection, colisao com obstaculos e regra de 3 acertos.
 - `ranking.py`: atualizar `player_stats` e consultas de ranking.
 - `game_config.py`: schema admin/config e leitura cacheada de `game_settings`.
 
@@ -42,6 +42,7 @@ server/
 - Persistencia no fim da partida em transacao unica.
 - Leitura periodica de `projectile_speed` e `movement_speed` sem reiniciar processo.
 - Bootstrap automatico de `game_settings` e `game_admin` no startup.
+- Estado da partida inclui obstaculos fixos para cobertura e bloqueio de rota.
 
 ## Endpoints HTTP auxiliares
 - `GET /health` para monitoramento.

@@ -32,6 +32,8 @@ class SimulationService:
         self.arena_min_y = 0.0
         self.arena_max_y = 100.0
         self.hit_distance = 6.0
+        self.player_collision_radius = 2.8
+        self.projectile_collision_radius = 0.6
 
     async def start(self, match: MatchState) -> None:
         match.task = asyncio.create_task(self._run(match))
@@ -61,14 +63,19 @@ class SimulationService:
         movement_speed = game_settings["movement_speed"]
         for player_state in room.players.values():
             match_player = match.players[player_state.user_id]
-            match_player.x = max(
+            next_x = max(
                 self.arena_min_x,
                 min(self.arena_max_x, match_player.x + (player_state.move_x * movement_speed)),
             )
-            match_player.y = max(
+            if not self._collides_with_obstacle(next_x, match_player.y, self.player_collision_radius, match):
+                match_player.x = next_x
+
+            next_y = max(
                 self.arena_min_y,
                 min(self.arena_max_y, match_player.y + (player_state.move_y * movement_speed)),
             )
+            if not self._collides_with_obstacle(match_player.x, next_y, self.player_collision_radius, match):
+                match_player.y = next_y
             match_player.aim_x = player_state.aim_x
             match_player.aim_y = player_state.aim_y
             if player_state.shoot_requested:
@@ -96,6 +103,8 @@ class SimulationService:
             projectile.y += projectile.velocity_y
             if projectile.x < 0 or projectile.x > 100 or projectile.y < 0 or projectile.y > 100:
                 continue
+            if self._collides_with_obstacle(projectile.x, projectile.y, self.projectile_collision_radius, match):
+                continue
             target = next(player for player in match.players.values() if player.user_id != projectile.owner_user_id)
             if math.hypot(projectile.x - target.x, projectile.y - target.y) <= self.hit_distance:
                 attacker = match.players[projectile.owner_user_id]
@@ -107,6 +116,15 @@ class SimulationService:
                 continue
             active.append(projectile)
         match.projectiles = active
+
+    @staticmethod
+    def _collides_with_obstacle(x: float, y: float, radius: float, match: MatchState) -> bool:
+        for obstacle in match.obstacles:
+            closest_x = max(obstacle.x, min(x, obstacle.x + obstacle.width))
+            closest_y = max(obstacle.y, min(y, obstacle.y + obstacle.height))
+            if math.hypot(x - closest_x, y - closest_y) <= radius:
+                return True
+        return False
 
     def _disconnected_timeout_user(self, room) -> int | None:
         now = datetime.now(timezone.utc)

@@ -13,6 +13,7 @@
   - Movimento em 8 direcoes
   - Mira pelo mouse
   - Disparo no clique esquerdo
+  - Obstaculos renderizados no mapa para cover e rotas
 - Perfil:
   - Vitorias, derrotas, desconexoes
 - Ranking:
@@ -29,6 +30,7 @@
 4. Receber `match_start`.
 5. Durante `playing`, enviar `player_input`.
 6. Renderizar estados recebidos por `state`.
+   - Incluir render de `obstacles` e colisao visual com cobertura.
 7. Ao `match_end`, mostrar resultado e voltar para lobby.
 
 ## Controles do game
