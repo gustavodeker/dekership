@@ -135,6 +135,14 @@ def build_ws_router(
                         "room_joined",
                         {"room_id": room.room_id, "side": player.side, "players": len(room.players)},
                     )
+                    if room.status == "playing" and room.match_id is not None:
+                        match = await matches.get_by_room(room.room_id)
+                        if match is not None:
+                            await manager.send_json(
+                                websocket,
+                                "match_start",
+                                {"match_id": match.match_id, "tick_rate": settings.ws_tick_rate},
+                            )
                     if is_new and len(room.players) == 2:
                         await persist_room_started(room)
                         match = await matches.start_match(room, room.room_db_id)

@@ -7,9 +7,11 @@ const leaveRoomBtn = document.getElementById('leave-room-btn');
 let ws;
 let requestId = 0;
 let currentRoomId = localStorage.getItem('dk_room_id') || null;
+let currentMatchId = localStorage.getItem('dk_match_id') || null;
 
 async function fetchSession() {
-  const response = await fetch(window.DK_SESSION.sessionEndpoint, { credentials: 'same-origin' });
+  const endpoint = `${window.DK_SESSION.sessionEndpoint}?_=${Date.now()}`;
+  const response = await fetch(endpoint, { credentials: 'same-origin', cache: 'no-store' });
   const data = await response.json();
   if (!data.ok) {
     window.location.href = '/index.php?page=login';
@@ -31,6 +33,7 @@ function setRoomState(roomId) {
   }
   localStorage.removeItem('dk_room_id');
   localStorage.removeItem('dk_match_id');
+  currentMatchId = null;
   leaveRoomBtn.style.display = 'none';
 }
 
@@ -75,6 +78,9 @@ async function connect() {
 
     if (event === 'auth_ok') {
       statusEl.textContent = `Conectado como ${payload.username}`;
+      if (currentRoomId && currentMatchId) {
+        send('room_join', { room_id: currentRoomId });
+      }
       return;
     }
 
@@ -110,11 +116,15 @@ async function connect() {
 
     if (event === 'match_start') {
       localStorage.setItem('dk_match_id', payload.match_id);
+      currentMatchId = payload.match_id;
       window.location.href = '/index.php?page=game';
       return;
     }
 
     if (event === 'error') {
+      if (payload.code === 'ROOM_NOT_FOUND') {
+        setRoomState(null);
+      }
       statusEl.textContent = `${payload.code}: ${payload.message}`;
     }
   });

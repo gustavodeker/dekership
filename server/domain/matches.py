@@ -60,6 +60,8 @@ class MatchState:
     task: asyncio.Task | None = None
     started_at: datetime = field(default_factory=utcnow)
     finished_at: datetime | None = None
+    paused_by_user_id: int | None = None
+    paused_until: datetime | None = None
 
 
 class MatchRegistry:

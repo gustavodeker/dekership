@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import Any
+from datetime import datetime, timezone
+import math
 
 from fastapi import WebSocket
 
@@ -49,11 +51,20 @@ class ConnectionManager:
 
     async def broadcast_state(self, room: RoomState, match: MatchState) -> None:
         players = {player.side: player for player in match.players.values()}
+        pause_remaining_seconds = 0
+        if match.paused_until is not None:
+            pause_remaining_seconds = max(
+                0,
+                math.ceil((match.paused_until - datetime.now(timezone.utc)).total_seconds()),
+            )
         await self.broadcast(
             room,
             "state",
             {
                 "tick": match.tick,
+                "paused": match.paused_until is not None,
+                "pause_remaining_seconds": pause_remaining_seconds,
+                "pause_disconnected_user_id": match.paused_by_user_id,
                 "p1": {
                     "user_id": players["bottom"].user_id,
                     "username": players["bottom"].username,

@@ -135,6 +135,10 @@ class RoomRegistry:
                     player.websocket = websocket
                     player.connected = True
                     player.disconnect_started_at = None
+                    player.input_seq = -1
+                    player.move_x = 0
+                    player.move_y = 0
+                    player.shoot_requested = False
                     return current_room, player, False, closed_rooms
                 _, room_closed = self._leave_room_unlocked(user_id)
                 if room_closed and current_room is not None:
@@ -171,6 +175,10 @@ class RoomRegistry:
             player.websocket = websocket
             player.connected = True
             player.disconnect_started_at = None
+            player.input_seq = -1
+            player.move_x = 0
+            player.move_y = 0
+            player.shoot_requested = False
             return room
 
     async def mark_disconnected(self, user_id: int) -> RoomState | None:

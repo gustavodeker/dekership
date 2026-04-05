@@ -17,6 +17,7 @@ let lastSentAt = 0;
 let pendingShot = false;
 let flushTimer = null;
 let resizeHandle = null;
+let matchStarted = false;
 
 function applyCanvasScale() {
   const panel = canvas.closest('.game-panel');
@@ -48,7 +49,8 @@ function scheduleCanvasScale() {
 }
 
 async function fetchSession() {
-  const response = await fetch(window.DK_SESSION.sessionEndpoint, { credentials: 'same-origin' });
+  const endpoint = `${window.DK_SESSION.sessionEndpoint}?_=${Date.now()}`;
+  const response = await fetch(endpoint, { credentials: 'same-origin', cache: 'no-store' });
   const data = await response.json();
   if (!data.ok) {
     window.location.href = '/index.php?page=login';
@@ -184,6 +186,15 @@ function render() {
   requestAnimationFrame(render);
 }
 
+function updateStatusFromState(payload) {
+  if (!matchStarted) return;
+  if (payload.paused) {
+    statusNode.textContent = `Partida pausada: aguardando reconexao (${payload.pause_remaining_seconds}s)`;
+    return;
+  }
+  statusNode.textContent = 'Partida em andamento';
+}
+
 async function connect() {
   const session = await fetchSession();
   if (!session) return;
@@ -202,12 +213,14 @@ async function connect() {
 
     if (event === 'match_start') {
       localStorage.setItem('dk_match_id', payload.match_id);
+      matchStarted = true;
       statusNode.textContent = 'Partida iniciada';
       return;
     }
 
     if (event === 'state') {
       state = payload;
+      updateStatusFromState(payload);
       return;
     }
 

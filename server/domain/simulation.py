@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import math
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from server.config import settings
 from server.domain.game_config import GameConfigService
@@ -46,13 +46,26 @@ class SimulationService:
                 room = await self.room_registry.get_room(match.room_id)
                 if room is None:
                     break
-                await self._apply_inputs(room, match)
-                await self._advance_projectiles(room, match)
-                disconnected = self._disconnected_timeout_user(room)
-                if disconnected is not None:
-                    winner = next(user_id for user_id in match.players if user_id != disconnected)
-                    await self._finish(match, winner, disconnected, "disconnect", disconnected)
-                    break
+                paused_remaining = self._pause_remaining_seconds(match)
+                if paused_remaining is not None:
+                    if self._is_connected(room, match.paused_by_user_id):
+                        match.paused_by_user_id = None
+                        match.paused_until = None
+                    elif paused_remaining <= 0 and match.paused_by_user_id is not None:
+                        disconnected = match.paused_by_user_id
+                        winner = next(user_id for user_id in match.players if user_id != disconnected)
+                        await self._finish(match, winner, disconnected, "disconnect", disconnected)
+                        break
+                else:
+                    disconnected = self._first_disconnected_user(room)
+                    if disconnected is not None:
+                        match.paused_by_user_id = disconnected
+                        match.paused_until = datetime.now(timezone.utc) + timedelta(
+                            seconds=settings.reconnect_timeout_seconds
+                        )
+                    else:
+                        await self._apply_inputs(room, match)
+                        await self._advance_projectiles(room, match)
                 await self.connection_manager.broadcast_state(room, match)
         except Exception:
             logger.exception("simulation_loop_failed", extra={"match_id": match.match_id, "room_id": match.room_id})
@@ -126,13 +139,28 @@ class SimulationService:
                 return True
         return False
 
-    def _disconnected_timeout_user(self, room) -> int | None:
-        now = datetime.now(timezone.utc)
+    @staticmethod
+    def _first_disconnected_user(room) -> int | None:
         for player in room.players.values():
-            if not player.connected and player.disconnect_started_at is not None:
-                if (now - player.disconnect_started_at).total_seconds() >= settings.reconnect_timeout_seconds:
-                    return player.user_id
+            if not player.connected:
+                return player.user_id
         return None
+
+    @staticmethod
+    def _is_connected(room, user_id: int | None) -> bool:
+        if user_id is None:
+            return False
+        player = room.players.get(user_id)
+        if player is None:
+            return False
+        return bool(player.connected and player.websocket is not None)
+
+    @staticmethod
+    def _pause_remaining_seconds(match: MatchState) -> int | None:
+        if match.paused_until is None:
+            return None
+        remaining = math.ceil((match.paused_until - datetime.now(timezone.utc)).total_seconds())
+        return max(0, remaining)
 
     async def _finish(
         self,

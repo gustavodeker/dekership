@@ -21,7 +21,7 @@ async def open_pool() -> None:
         db=settings.db_name,
         minsize=1,
         maxsize=10,
-        autocommit=False,
+        autocommit=True,
         charset="utf8mb4",
     )
 
