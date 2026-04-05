@@ -42,7 +42,8 @@ class GameConfigService:
                     INSERT INTO game_settings (setting_key, setting_value)
                     VALUES
                       ('projectile_speed', '1.6'),
-                      ('movement_speed', '3.0')
+                      ('movement_speed', '3.0'),
+                      ('render_smoothing', '0.25')
                     ON DUPLICATE KEY UPDATE setting_value = setting_value
                     """
                 )
@@ -67,4 +68,5 @@ class GameConfigService:
         return {
             "projectile_speed": float(self._cache.get("projectile_speed", "1.6")),
             "movement_speed": float(self._cache.get("movement_speed", "3.0")),
+            "render_smoothing": float(self._cache.get("render_smoothing", "0.25")),
         }

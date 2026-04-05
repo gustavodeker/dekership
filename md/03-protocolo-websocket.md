@@ -41,7 +41,7 @@
 - `match_start`
   - payload: `{ "match_id": "uuid", "tick_rate": 30 }`
 - `state`
-  - payload: `{ "tick": 145, "paused": false, "pause_remaining_seconds": 0, "pause_disconnected_user_id": null, "p1": { "x": 50, "y": 82, "aim_x": 55, "aim_y": 70, ... }, "p2": { "x": 50, "y": 18, "aim_x": 40, "aim_y": 30, ... }, "projectiles": [{ "x": 45, "y": 40, "velocity_x": 0.8, "velocity_y": -1.3 }], "obstacles": [{ "x": 44, "y": 35, "width": 12, "height": 30 }], "score": { "p1": 2, "p2": 1 } }`
+  - payload: `{ "tick": 145, "paused": false, "pause_remaining_seconds": 0, "pause_disconnected_user_id": null, "p1": { "x": 50, "y": 82, "aim_x": 55, "aim_y": 70, ... }, "p2": { "x": 50, "y": 18, "aim_x": 40, "aim_y": 30, ... }, "projectiles": [{ "projectile_id": 42, "x": 45, "y": 40, "velocity_x": 0.8, "velocity_y": -1.3 }], "obstacles": [{ "x": 44, "y": 35, "width": 12, "height": 30 }], "score": { "p1": 2, "p2": 1 } }`
 - `hit`
   - payload: `{ "match_id": "uuid", "attacker": 10, "target": 11, "score": { "attacker": 3, "target": 1 } }`
 - `match_end`
@@ -65,4 +65,5 @@
 - `state` enviado em intervalo fixo (ex.: 20-30 Hz).
 - Mira e movimento usam coordenadas normalizadas de arena (`0..100`).
 - Cliente trata `obstacles` como colisores solidos de mapa.
+- `projectile_id` e estavel por vida do projetil e deve ser usado para interpolacao no cliente.
 - Heartbeat: `ping/pong` a cada 5s; queda apos 2 perdas consecutivas.

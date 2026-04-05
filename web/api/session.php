@@ -34,12 +34,28 @@ if (!is_string($freshToken) || $freshToken === '') {
 
 $_SESSION['auth_user']['token'] = $freshToken;
 
+$renderSmoothing = 0.25;
+try {
+    $settingStmt = db()->prepare(
+        "SELECT setting_value FROM game_settings WHERE setting_key = 'render_smoothing' LIMIT 1"
+    );
+    $settingStmt->execute();
+    $value = $settingStmt->fetchColumn();
+    if ($value !== false) {
+        $renderSmoothing = (float) $value;
+    }
+} catch (Throwable $throwable) {
+    $renderSmoothing = 0.25;
+}
+$renderSmoothing = max(0.0, min(1.0, $renderSmoothing));
+
 echo json_encode([
     'ok' => true,
     'user_id' => $user['user_id'],
     'username' => $user['username'],
     'display_name' => $user['display_name'],
     'token' => $freshToken,
+    'render_smoothing' => $renderSmoothing,
     'ws_url' => app_config()['ws_url'],
 ], JSON_UNESCAPED_SLASHES);
 

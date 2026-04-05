@@ -85,6 +85,7 @@ class ConnectionManager:
                 },
                 "projectiles": [
                     {
+                        "projectile_id": projectile.projectile_id,
                         "owner_user_id": projectile.owner_user_id,
                         "x": projectile.x,
                         "y": projectile.y,

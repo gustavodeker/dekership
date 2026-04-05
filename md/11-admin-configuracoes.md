@@ -8,6 +8,7 @@
 ## Configuracoes de gameplay
 - `projectile_speed`: velocidade vertical do projetil.
 - `movement_speed`: deslocamento horizontal por tick.
+- `render_smoothing`: fator de suavizacao visual no cliente (`0..1`).
 - Persistencia em `game_settings`.
 
 ## Regras operacionais

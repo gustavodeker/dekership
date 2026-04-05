@@ -11,6 +11,8 @@ let requestId = 0;
 let inputSeq = 0;
 let myUserId = null;
 let state = null;
+let renderState = null;
+let renderSmoothing = 0.25;
 const pressed = { left: false, right: false, up: false, down: false };
 const pointer = { x: 50, y: 50 };
 let lastSentAt = 0;
@@ -57,6 +59,9 @@ async function fetchSession() {
     return null;
   }
   myUserId = data.user_id;
+  if (typeof data.render_smoothing === 'number') {
+    renderSmoothing = Math.max(0, Math.min(1, data.render_smoothing));
+  }
   return data;
 }
 
@@ -94,6 +99,66 @@ function arenaToCanvasX(x) {
 
 function arenaToCanvasY(y) {
   return (y / 100) * canvas.height;
+}
+
+function lerp(from, to, alpha) {
+  return from + (to - from) * alpha;
+}
+
+function cloneGameState(snapshot) {
+  return {
+    ...snapshot,
+    p1: { ...snapshot.p1 },
+    p2: { ...snapshot.p2 },
+    score: { ...snapshot.score },
+    obstacles: (snapshot.obstacles || []).map((obstacle) => ({ ...obstacle })),
+    projectiles: (snapshot.projectiles || []).map((projectile) => ({ ...projectile })),
+  };
+}
+
+function blendPlayer(currentPlayer, targetPlayer, alpha) {
+  return {
+    ...targetPlayer,
+    x: lerp(currentPlayer.x, targetPlayer.x, alpha),
+    y: lerp(currentPlayer.y, targetPlayer.y, alpha),
+    aim_x: lerp(currentPlayer.aim_x, targetPlayer.aim_x, alpha),
+    aim_y: lerp(currentPlayer.aim_y, targetPlayer.aim_y, alpha),
+  };
+}
+
+function blendProjectiles(currentProjectiles, targetProjectiles, alpha) {
+  const currentById = new Map(
+    currentProjectiles
+      .filter((projectile) => Number.isFinite(projectile.projectile_id))
+      .map((projectile) => [projectile.projectile_id, projectile])
+  );
+
+  return targetProjectiles.map((targetProjectile) => {
+    const projectileId = targetProjectile.projectile_id;
+    const currentProjectile = Number.isFinite(projectileId) ? currentById.get(projectileId) : null;
+    if (!currentProjectile) {
+      return { ...targetProjectile };
+    }
+    return {
+      ...targetProjectile,
+      x: lerp(currentProjectile.x, targetProjectile.x, alpha),
+      y: lerp(currentProjectile.y, targetProjectile.y, alpha),
+    };
+  });
+}
+
+function blendState(current, target, alpha) {
+  if (!current) {
+    return cloneGameState(target);
+  }
+  return {
+    ...target,
+    p1: blendPlayer(current.p1, target.p1, alpha),
+    p2: blendPlayer(current.p2, target.p2, alpha),
+    score: { ...target.score },
+    obstacles: (target.obstacles || []).map((obstacle) => ({ ...obstacle })),
+    projectiles: blendProjectiles(current.projectiles || [], target.projectiles || [], alpha),
+  };
 }
 
 function syncPointerFromEvent(event) {
@@ -187,10 +252,11 @@ function render() {
   context.fillRect(0, 0, canvas.width, canvas.height);
 
   if (state) {
-    (state.obstacles || []).forEach(drawObstacle);
-    drawPlayer(state.p1, state.p1.user_id === myUserId ? '#22c55e' : '#3b82f6');
-    drawPlayer(state.p2, state.p2.user_id === myUserId ? '#22c55e' : '#ef4444');
-    state.projectiles.forEach(drawProjectile);
+    renderState = blendState(renderState, state, renderSmoothing);
+    (renderState.obstacles || []).forEach(drawObstacle);
+    drawPlayer(renderState.p1, renderState.p1.user_id === myUserId ? '#22c55e' : '#3b82f6');
+    drawPlayer(renderState.p2, renderState.p2.user_id === myUserId ? '#22c55e' : '#ef4444');
+    renderState.projectiles.forEach(drawProjectile);
     const selfIsBottom = state.p1.user_id === myUserId;
     scoreSelf.textContent = selfIsBottom ? state.score.p1 : state.score.p2;
     scoreOpponent.textContent = selfIsBottom ? state.score.p2 : state.score.p1;
@@ -233,6 +299,9 @@ async function connect() {
 
     if (event === 'state') {
       state = payload;
+      if (!renderState) {
+        renderState = cloneGameState(payload);
+      }
       updateStatusFromState(payload);
       return;
     }

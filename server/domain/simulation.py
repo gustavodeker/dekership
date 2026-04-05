@@ -100,6 +100,7 @@ class SimulationService:
                     match_player.last_shot_tick = match.tick
                     match.projectiles.append(
                         Projectile(
+                            projectile_id=match.next_projectile_id,
                             owner_user_id=match_player.user_id,
                             x=match_player.x,
                             y=match_player.y,
@@ -108,6 +109,7 @@ class SimulationService:
                             speed=game_settings["projectile_speed"],
                         )
                     )
+                    match.next_projectile_id += 1
 
     async def _advance_projectiles(self, room, match: MatchState) -> None:
         active: list[Projectile] = []

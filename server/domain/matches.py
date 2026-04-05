@@ -28,6 +28,7 @@ class MatchPlayer:
 
 @dataclass(slots=True)
 class Projectile:
+    projectile_id: int
     owner_user_id: int
     x: float
     y: float
@@ -62,6 +63,7 @@ class MatchState:
     finished_at: datetime | None = None
     paused_by_user_id: int | None = None
     paused_until: datetime | None = None
+    next_projectile_id: int = 1
 
 
 class MatchRegistry:

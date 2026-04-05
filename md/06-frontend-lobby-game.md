@@ -24,6 +24,7 @@
 - Configuracoes:
   - Visivel apenas para admin
   - Ajuste de velocidade de projetil e movimento
+  - Ajuste de suavizacao visual (`render_smoothing` 0..1)
   - Controle de privilegio admin por usuario
 
 ## Fluxo no cliente
@@ -36,6 +37,8 @@
 5. Durante `playing`, enviar `player_input`.
 6. Renderizar estados recebidos por `state`.
    - Incluir render de `obstacles` e colisao visual com cobertura.
+   - Interpolar nave e projetil entre snapshots.
+   - Parear projetil por `projectile_id` (nao por indice).
 7. Ao `match_end`, mostrar resultado e voltar para lobby.
 8. Tratar `room_closed` para limpar estado local de sala (`dk_room_id`/`dk_match_id`) e atualizar lista.
 
