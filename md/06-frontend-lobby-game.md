@@ -3,6 +3,7 @@
 ## Telas
 - Lobby inicial (apos login):
   - Botao `Criar sala`
+  - Botao `Sair da sala`
   - Lista de salas abertas com botao `Entrar`
 - Sala:
   - Jogadores conectados
@@ -27,11 +28,14 @@
 1. Abrir WS e enviar `auth`.
 2. Receber `room_list_result` automaticamente ao conectar.
 3. Criar ou entrar em sala.
+   - Se ja estiver em sala propria e clicar `Entrar` em outra, a sala atual e desfeita automaticamente.
+   - Se criador clicar `Sair da sala`, sala e encerrada para todos.
 4. Receber `match_start`.
 5. Durante `playing`, enviar `player_input`.
 6. Renderizar estados recebidos por `state`.
    - Incluir render de `obstacles` e colisao visual com cobertura.
 7. Ao `match_end`, mostrar resultado e voltar para lobby.
+8. Tratar `room_closed` para limpar estado local de sala (`dk_room_id`/`dk_match_id`) e atualizar lista.
 
 ## Controles do game
 - `WASD` ou setas: mover

@@ -18,6 +18,8 @@
   - payload: `{}`
 - `room_join`
   - payload: `{ "room_id": "uuid" }`
+- `room_leave`
+  - payload: `{}`
 - `player_input`
   - payload: `{ "seq": 12, "move_x": -1|0|1, "move_y": -1|0|1, "aim_x": 0-100, "aim_y": 0-100, "shoot": true|false }`
 - `ping`
@@ -32,6 +34,10 @@
   - payload: `{ "rooms": [{ "room_id": "uuid", "name": "Sala 1", "players": 1 }] }`
 - `room_joined`
   - payload: `{ "room_id": "uuid", "side": "bottom|top", "players": 2 }`
+- `room_left`
+  - payload: `{ "room_id": "uuid" }`
+- `room_closed`
+  - payload: `{ "room_id": "uuid", "reason": "owner_left|owner_disconnected" }`
 - `match_start`
   - payload: `{ "match_id": "uuid", "tick_rate": 30 }`
 - `state`
@@ -46,6 +52,10 @@
   - payload: `{ "code": "ROOM_FULL|UNAUTHORIZED|INVALID_STATE|RATE_LIMIT", "message": "..." }`
 
 ## Regras de sincronizacao
+- Se usuario ja estiver em sala e enviar `room_join` para outra, sala atual e desfeita antes da entrada na nova.
+- Se criador sair com `room_leave`, a sala e encerrada (`room_closed`).
+- Se criador desconectar em `waiting`, a sala e encerrada (`room_closed`).
+- Em `playing`, desconexao do criador nao encerra sala; segue regra de timeout de reconexao da partida.
 - Cliente envia apenas input, nunca estado final.
 - Servidor usa `seq` para descartar input antigo.
 - `state` enviado em intervalo fixo (ex.: 20-30 Hz).

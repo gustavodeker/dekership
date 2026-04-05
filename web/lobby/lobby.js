@@ -2,9 +2,11 @@ const statusEl = document.getElementById('lobby-status');
 const roomListEl = document.getElementById('room-list');
 const createRoomForm = document.getElementById('create-room-form');
 const roomNameEl = document.getElementById('room-name');
+const leaveRoomBtn = document.getElementById('leave-room-btn');
 
 let ws;
 let requestId = 0;
+let currentRoomId = localStorage.getItem('dk_room_id') || null;
 
 async function fetchSession() {
   const response = await fetch(window.DK_SESSION.sessionEndpoint, { credentials: 'same-origin' });
@@ -18,6 +20,18 @@ async function fetchSession() {
 
 function send(event, payload = {}) {
   ws.send(JSON.stringify({ event, payload, request_id: String(++requestId) }));
+}
+
+function setRoomState(roomId) {
+  currentRoomId = roomId;
+  if (roomId) {
+    localStorage.setItem('dk_room_id', roomId);
+    leaveRoomBtn.style.display = 'inline-flex';
+    return;
+  }
+  localStorage.removeItem('dk_room_id');
+  localStorage.removeItem('dk_match_id');
+  leaveRoomBtn.style.display = 'none';
 }
 
 function renderRooms(rooms) {
@@ -47,6 +61,7 @@ function renderRooms(rooms) {
 async function connect() {
   const session = await fetchSession();
   if (!session) return;
+  setRoomState(currentRoomId);
 
   ws = new WebSocket(session.ws_url);
   ws.addEventListener('open', () => {
@@ -69,8 +84,26 @@ async function connect() {
     }
 
     if (event === 'room_created' || event === 'room_joined') {
-      localStorage.setItem('dk_room_id', payload.room_id);
+      setRoomState(payload.room_id);
       statusEl.textContent = 'Sala pronta';
+      send('room_list');
+      return;
+    }
+
+    if (event === 'room_left') {
+      if (payload.room_id === currentRoomId) {
+        setRoomState(null);
+      }
+      statusEl.textContent = 'Saiu da sala';
+      send('room_list');
+      return;
+    }
+
+    if (event === 'room_closed') {
+      if (payload.room_id === currentRoomId) {
+        setRoomState(null);
+        statusEl.textContent = 'Sala encerrada';
+      }
       send('room_list');
       return;
     }
@@ -97,6 +130,11 @@ createRoomForm.addEventListener('submit', (event) => {
   if (!roomName) return;
   send('room_create', { room_name: roomName });
   roomNameEl.value = '';
+});
+
+leaveRoomBtn.addEventListener('click', () => {
+  if (!currentRoomId) return;
+  send('room_leave');
 });
 
 connect();

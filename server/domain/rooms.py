@@ -88,13 +88,45 @@ class RoomRegistry:
             self.rooms[room_id] = room
             return room
 
+    def _leave_room_unlocked(self, user_id: int) -> tuple[RoomState | None, bool]:
+        room_id = self.room_ids_by_user.get(user_id)
+        if room_id is None:
+            return None, False
+        room = self.rooms.get(room_id)
+        if room is None:
+            self.room_ids_by_user.pop(user_id, None)
+            return None, False
+
+        is_creator = room.created_by_user_id == user_id
+        self.room_ids_by_user.pop(user_id, None)
+        room.players.pop(user_id, None)
+
+        if is_creator:
+            room.status = "closed"
+            self.rooms.pop(room_id, None)
+            for other_user_id in list(room.players):
+                self.room_ids_by_user.pop(other_user_id, None)
+            return room, True
+
+        if not room.players:
+            room.status = "closed"
+            self.rooms.pop(room_id, None)
+            return room, True
+
+        return room, False
+
+    async def leave_room(self, user_id: int) -> tuple[RoomState | None, bool]:
+        async with self.lock:
+            return self._leave_room_unlocked(user_id)
+
     async def join_room(
         self,
         room_id: str,
         user_id: int,
         username: str,
         websocket: Any,
-    ) -> tuple[RoomState, PlayerState, bool]:
+    ) -> tuple[RoomState, PlayerState, bool, list[RoomState]]:
+        closed_rooms: list[RoomState] = []
         async with self.lock:
             if user_id in self.room_ids_by_user:
                 current_room = self.rooms.get(self.room_ids_by_user[user_id])
@@ -103,8 +135,10 @@ class RoomRegistry:
                     player.websocket = websocket
                     player.connected = True
                     player.disconnect_started_at = None
-                    return current_room, player, False
-                raise ValueError("INVALID_STATE")
+                    return current_room, player, False, closed_rooms
+                _, room_closed = self._leave_room_unlocked(user_id)
+                if room_closed and current_room is not None:
+                    closed_rooms.append(current_room)
 
             room = self.rooms.get(room_id)
             if room is None:
@@ -121,7 +155,7 @@ class RoomRegistry:
             )
             room.players[user_id] = player
             self.room_ids_by_user[user_id] = room_id
-            return room, player, True
+            return room, player, True, closed_rooms
 
     async def attach_existing_connection(self, user_id: int, websocket: Any) -> RoomState | None:
         async with self.lock:
