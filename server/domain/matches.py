@@ -19,6 +19,9 @@ class MatchPlayer:
     username: str
     side: str
     x: float
+    y: float
+    aim_x: float
+    aim_y: float
     hits: int = 0
     last_shot_tick: int = 0
 
@@ -28,7 +31,8 @@ class Projectile:
     owner_user_id: int
     x: float
     y: float
-    direction: int
+    velocity_x: float
+    velocity_y: float
     speed: float = 1.6
 
 
@@ -66,8 +70,8 @@ class MatchRegistry:
                 room_id=room.room_id,
                 room_db_id=room_db_id,
                 players={
-                    bottom.user_id: MatchPlayer(bottom.user_id, bottom.username, "bottom", 50.0),
-                    top.user_id: MatchPlayer(top.user_id, top.username, "top", 50.0),
+                    bottom.user_id: MatchPlayer(bottom.user_id, bottom.username, "bottom", 50.0, 82.0, 50.0, 0.0),
+                    top.user_id: MatchPlayer(top.user_id, top.username, "top", 50.0, 18.0, 50.0, 100.0),
                 },
             )
             self.matches[match_id] = state

@@ -58,12 +58,18 @@ class ConnectionManager:
                     "user_id": players["bottom"].user_id,
                     "username": players["bottom"].username,
                     "x": players["bottom"].x,
+                    "y": players["bottom"].y,
+                    "aim_x": players["bottom"].aim_x,
+                    "aim_y": players["bottom"].aim_y,
                     "side": "bottom",
                 },
                 "p2": {
                     "user_id": players["top"].user_id,
                     "username": players["top"].username,
                     "x": players["top"].x,
+                    "y": players["top"].y,
+                    "aim_x": players["top"].aim_x,
+                    "aim_y": players["top"].aim_y,
                     "side": "top",
                 },
                 "projectiles": [
@@ -71,6 +77,8 @@ class ConnectionManager:
                         "owner_user_id": projectile.owner_user_id,
                         "x": projectile.x,
                         "y": projectile.y,
+                        "velocity_x": projectile.velocity_x,
+                        "velocity_y": projectile.velocity_y,
                     }
                     for projectile in match.projectiles
                 ],

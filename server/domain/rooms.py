@@ -22,6 +22,9 @@ class PlayerState:
     connected: bool = False
     input_seq: int = -1
     move_x: int = 0
+    move_y: int = 0
+    aim_x: float = 50.0
+    aim_y: float = 50.0
     shoot_requested: bool = False
     disconnect_started_at: datetime | None = None
 

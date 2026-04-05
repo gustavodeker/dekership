@@ -19,7 +19,7 @@
 - `room_join`
   - payload: `{ "room_id": "uuid" }`
 - `player_input`
-  - payload: `{ "seq": 12, "move_x": -1|0|1, "shoot": true|false }`
+  - payload: `{ "seq": 12, "move_x": -1|0|1, "move_y": -1|0|1, "aim_x": 0-100, "aim_y": 0-100, "shoot": true|false }`
 - `ping`
   - payload: `{ "ts": 1712345678 }`
 
@@ -35,7 +35,7 @@
 - `match_start`
   - payload: `{ "match_id": "uuid", "tick_rate": 30 }`
 - `state`
-  - payload: `{ "tick": 145, "p1": {...}, "p2": {...}, "projectiles": [...], "score": { "p1": 2, "p2": 1 } }`
+  - payload: `{ "tick": 145, "p1": { "x": 50, "y": 82, "aim_x": 55, "aim_y": 70, ... }, "p2": { "x": 50, "y": 18, "aim_x": 40, "aim_y": 30, ... }, "projectiles": [{ "x": 45, "y": 40, "velocity_x": 0.8, "velocity_y": -1.3 }], "score": { "p1": 2, "p2": 1 } }`
 - `hit`
   - payload: `{ "match_id": "uuid", "attacker": 10, "target": 11, "score": { "attacker": 3, "target": 1 } }`
 - `match_end`
@@ -49,4 +49,5 @@
 - Cliente envia apenas input, nunca estado final.
 - Servidor usa `seq` para descartar input antigo.
 - `state` enviado em intervalo fixo (ex.: 20-30 Hz).
+- Mira e movimento usam coordenadas normalizadas de arena (`0..100`).
 - Heartbeat: `ping/pong` a cada 5s; queda apos 2 perdas consecutivas.

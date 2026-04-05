@@ -2,8 +2,10 @@
 
 ## Regras fechadas
 - Partida sempre com 2 jogadores.
-- Jogador A atira de baixo para cima.
-- Jogador B atira de cima para baixo.
+- Movimento livre em 2 eixos dentro da arena.
+- Nave sempre orientada pela posicao atual do cursor.
+- Disparo ocorre no clique esquerdo.
+- Projetil sai da posicao atual da nave e segue a direcao da mira.
 - Cada acerto no oponente soma 1 hit.
 - Vence quem atingir 3 hits primeiro.
 

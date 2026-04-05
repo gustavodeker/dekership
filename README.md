@@ -5,6 +5,13 @@
 - `web/`: login, lobby, game, perfil, ranking e APIs PHP
 - `BANCO/migrations/001_1v1_schema.sql`: schema 1v1
 
+## Controles
+- Movimento: `WASD` ou setas
+- Mira: cursor do mouse
+- Tiro: clique esquerdo
+- Nave aponta em tempo real para o cursor
+- Projetil segue a direcao da mira
+
 ## Subida local
 1. Copiar `.env.example` para `.env`
 2. Aplicar `BANCO/migrations/001_1v1_schema.sql`

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import logging
 from datetime import datetime, timezone
 
@@ -28,9 +29,9 @@ class SimulationService:
         self.tick_interval = 1 / settings.ws_tick_rate
         self.arena_min_x = 0.0
         self.arena_max_x = 100.0
-        self.bottom_y = 92.0
-        self.top_y = 8.0
-        self.hit_distance = 8.0
+        self.arena_min_y = 0.0
+        self.arena_max_y = 100.0
+        self.hit_distance = 6.0
 
     async def start(self, match: MatchState) -> None:
         match.task = asyncio.create_task(self._run(match))
@@ -64,16 +65,26 @@ class SimulationService:
                 self.arena_min_x,
                 min(self.arena_max_x, match_player.x + (player_state.move_x * movement_speed)),
             )
+            match_player.y = max(
+                self.arena_min_y,
+                min(self.arena_max_y, match_player.y + (player_state.move_y * movement_speed)),
+            )
+            match_player.aim_x = player_state.aim_x
+            match_player.aim_y = player_state.aim_y
             if player_state.shoot_requested:
                 player_state.shoot_requested = False
                 if (match.tick - match_player.last_shot_tick) >= 6:
+                    delta_x = match_player.aim_x - match_player.x
+                    delta_y = match_player.aim_y - match_player.y
+                    distance = math.hypot(delta_x, delta_y) or 1.0
                     match_player.last_shot_tick = match.tick
                     match.projectiles.append(
                         Projectile(
                             owner_user_id=match_player.user_id,
                             x=match_player.x,
-                            y=self.bottom_y if match_player.side == "bottom" else self.top_y,
-                            direction=-1 if match_player.side == "bottom" else 1,
+                            y=match_player.y,
+                            velocity_x=(delta_x / distance) * game_settings["projectile_speed"],
+                            velocity_y=(delta_y / distance) * game_settings["projectile_speed"],
                             speed=game_settings["projectile_speed"],
                         )
                     )
@@ -81,12 +92,12 @@ class SimulationService:
     async def _advance_projectiles(self, room, match: MatchState) -> None:
         active: list[Projectile] = []
         for projectile in match.projectiles:
-            projectile.y += projectile.direction * projectile.speed
-            if projectile.y < 0 or projectile.y > 100:
+            projectile.x += projectile.velocity_x
+            projectile.y += projectile.velocity_y
+            if projectile.x < 0 or projectile.x > 100 or projectile.y < 0 or projectile.y > 100:
                 continue
             target = next(player for player in match.players.values() if player.user_id != projectile.owner_user_id)
-            target_y = self.top_y if target.side == "top" else self.bottom_y
-            if abs(projectile.y - target_y) <= projectile.speed and abs(projectile.x - target.x) <= self.hit_distance:
+            if math.hypot(projectile.x - target.x, projectile.y - target.y) <= self.hit_distance:
                 attacker = match.players[projectile.owner_user_id]
                 attacker.hits += 1
                 await self.connection_manager.broadcast_hit(room, match, attacker.user_id, target.user_id)

@@ -10,6 +10,9 @@
 - Game:
   - Canvas/area de jogo
   - HUD de hits (0 a 3)
+  - Movimento em 8 direcoes
+  - Mira pelo mouse
+  - Disparo no clique esquerdo
 - Perfil:
   - Vitorias, derrotas, desconexoes
 - Ranking:
@@ -27,6 +30,12 @@
 5. Durante `playing`, enviar `player_input`.
 6. Renderizar estados recebidos por `state`.
 7. Ao `match_end`, mostrar resultado e voltar para lobby.
+
+## Controles do game
+- `WASD` ou setas: mover
+- Mouse: mirar
+- Clique esquerdo: atirar
+- Nave renderizada com rotacao em tempo real
 
 ## Organizacao de arquivos sugerida
 ```text

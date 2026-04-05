@@ -143,6 +143,9 @@ def build_ws_router(
                         continue
                     player.input_seq = payload.seq
                     player.move_x = payload.move_x
+                    player.move_y = payload.move_y
+                    player.aim_x = payload.aim_x
+                    player.aim_y = payload.aim_y
                     player.shoot_requested = payload.shoot
                     continue
 

@@ -14,6 +14,9 @@ class Envelope(BaseModel):
 class PlayerInputPayload(BaseModel):
     seq: int = Field(ge=0)
     move_x: int = Field(ge=-1, le=1)
+    move_y: int = Field(ge=-1, le=1)
+    aim_x: float = Field(ge=0, le=100)
+    aim_y: float = Field(ge=0, le=100)
     shoot: bool = False
 
 
