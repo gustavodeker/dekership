@@ -1,8 +1,6 @@
 <?php
-// Verifique se um parâmetro 'page' está presente na URL
-$page = isset($_GET['page']) ? $_GET['page'] : 'login';
+$page = $_GET['page'] ?? 'login';
 
-// Use um switch para determinar a ação com base no valor de 'page'
 switch ($page) {
     case 'auth':
         include 'config/auth.php';
@@ -13,16 +11,22 @@ switch ($page) {
     case 'cadastro':
         include 'web/cadastro/cadastro.php';
         break;
+    case 'lobby':
+        include 'web/lobby/lobby.php';
+        break;
     case 'game':
         include 'web/game/game.php';
+        break;
+    case 'profile':
+        include 'web/profile/profile.php';
         break;
     case 'ranking':
         include 'web/ranking/ranking.php';
         break;
     case 'logout':
-        include 'web/logout.php';
+        include 'logout.php';
         break;
     default:
-        include 'web/404/404.php'; // Página não encontrada
+        include 'web/404/404.php';
         break;
 }

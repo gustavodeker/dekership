@@ -1,28 +1,29 @@
 # Plano de implementacao (ordem recomendada)
 
 ## Fase 1 - Banco
-- Criar tabelas `game_room`, `game_match`, `player_stats`.
-- Validar indices e chaves estrangeiras.
-- Criar query de ranking por vitorias.
+- Concluido: criadas `game_room`, `game_match`, `player_stats`.
+- Concluido: indices principais criados para status, criador, vencedor e ranking.
+- Pendente opcional: reintroduzir FKs na VPS quando nao houver `metadata lock`.
 
 ## Fase 2 - Servidor Python
-- Implementar autenticacao WS por token de sessao.
-- Implementar criar/listar/entrar sala.
-- Iniciar partida automatica ao segundo jogador entrar.
-- Implementar loop de jogo e regra de 3 hits.
-- Persistir resultado no banco.
+- Concluido: autenticacao WS por token de sessao PHP.
+- Concluido: criar/listar/entrar sala.
+- Concluido: inicio automatico ao segundo jogador entrar.
+- Concluido: loop de jogo e regra de 3 hits.
+- Concluido: persistencia de resultado no banco.
 
 ## Fase 3 - PHP/Frontend
-- Criar tela lobby com lista de salas e botao criar sala.
-- Integrar cliente WS no lobby e jogo.
-- Atualizar perfil com `wins/losses/disconnects`.
-- Atualizar ranking para fonte `player_stats`.
+- Concluido: lobby com criar sala e lista de salas.
+- Concluido: cliente WS no lobby e no jogo.
+- Concluido: perfil com `wins/losses/disconnects`.
+- Concluido: ranking lendo `player_stats`.
+- Concluido: redirecionamento dos entrypoints legados para o fluxo novo.
 
 ## Fase 4 - Validacao
-- Testar 2 clientes simultaneos em rede local.
-- Testar desconexao no meio da partida.
-- Testar concorrencia de criacao/entrada de salas.
-- Testar atualizacao de ranking apos varias partidas.
+- Em andamento: teste com 2 clientes simultaneos em rede local.
+- Pendente: validar desconexao no meio da partida.
+- Pendente: validar concorrencia de criacao/entrada de salas com repeticao.
+- Pendente: validar atualizacao de ranking apos varias partidas.
 
 ## Criterios de aceite
 - Sala inicia automaticamente com 2 jogadores.
@@ -30,3 +31,9 @@
 - Vencedor e perdedor persistidos corretamente.
 - Perfil mostra vitorias e derrotas corretas.
 - Ranking ordena por maior numero de vitorias.
+
+## Estado atual
+- Fluxo alvo: `login -> lobby -> room_create/room_join -> match_start -> game`.
+- Porta ativa de teste local: `8766`.
+- Cliente so navega do lobby para o game no evento `match_start`.
+- Servidor reenvia `match_start` quando o jogador reconecta em sala `playing`.

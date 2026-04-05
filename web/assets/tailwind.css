@@ -1,0 +1,24 @@
+:root {
+  --bg: #0e1726;
+  --panel: #16233b;
+  --line: #2d3b56;
+  --text: #e9eef7;
+  --accent: #2ea043;
+  --danger: #e5534b;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.container { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.btn { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 10px 14px; cursor: pointer; }
+.btn-danger { background: var(--danger); }
+.input { background: #0d1628; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td { border-bottom: 1px solid var(--line); padding: 10px; text-align: left; }

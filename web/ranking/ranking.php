@@ -1,58 +1,62 @@
 <?php
-include("config/auth.php");
-global $pdo;
+include 'config/auth.php';
 sessionVerif();
 
-function tabelaRanking()
+function rankingRows(): array
 {
     global $pdo;
-    $sql = $pdo->prepare("SELECT * FROM ranking ORDER BY pontuacao desc");
+    $sql = $pdo->prepare(
+        'SELECT u.usuario, s.wins, s.losses, s.disconnects
+         FROM player_stats s
+         JOIN usuario u ON u.id = s.user_id
+         ORDER BY s.wins DESC, s.losses ASC
+         LIMIT 100'
+    );
     $sql->execute();
-    while ($row = $sql->fetch(PDO::FETCH_ASSOC)) {
-        $data = $row['dataRanking'];
-        $dataf = new DateTime($data);
-        $dataf = $dataf->format('d/m/Y H:i:s');
-
-        echo "<tr>";
-        echo "<td>" . $row['usuario'] . "</td>";
-        echo "<td>" . $row['pontuacao'] . "</td>";
-        echo "<td> $dataf </td>";
-    }
+    return $sql->fetchAll();
 }
+
+$rows = rankingRows();
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
-
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Dekership : Ranking</title>
-    <link rel="stylesheet" href="css/datatable.css">
+    <title>Dekership - Ranking</title>
+    <link rel="stylesheet" href="web/assets/tailwind.css">
     <link rel="stylesheet" href="web/ranking/ranking.css">
 </head>
-
 <body>
-    <?php include 'header.php'; ?>
-    <main class="main">
-        <div class="div-tabela">
-            <table id="tabela-ranking">
-                <thead>
-                    <td>Jogador</td>
-                    <td>PontuaÃ§Ã£o</td>
-                    <td>Data</td>
-                </thead>
-                <tbody>
-                    <?php tabelaRanking(); ?>
-                </tbody>
-            </table>
-        </div>
-    </main>
+<?php include 'header.php'; ?>
+<div class="container">
+    <div class="card">
+        <h2>Ranking 1v1</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Jogador</th>
+                    <th>Vitórias</th>
+                    <th>Derrotas</th>
+                    <th>Desconexões</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (!$rows): ?>
+                    <tr><td colspan="4">Sem dados.</td></tr>
+                <?php else: ?>
+                    <?php foreach ($rows as $row): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($row['usuario']) ?></td>
+                            <td><?= (int)$row['wins'] ?></td>
+                            <td><?= (int)$row['losses'] ?></td>
+                            <td><?= (int)$row['disconnects'] ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
 </body>
 </html>
-
-<!--Datatable DependÃªncias-->
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
-<script src="js/datatable.js"></script>
-<!-- Datatable - Tabela -->
-<script src="web/ranking/ranking.js"></script>

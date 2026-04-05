@@ -1,94 +1,42 @@
 <?php
-include("config/auth.php");
-global $pdo;
+include 'config/auth.php';
 sessionVerif();
-
-if (isset($_SESSION['mensagem'])) {
-    echo $_SESSION['mensagem'];
-}
-
-if (isset($_POST['submit'])) {
-    $user = $_POST['usuario'];
-    $pontuacao = $_POST['pontuacao'];
-    if ($pontuacao > 0) {
-        try {
-            $data = date('Y-m-d H:i:s');
-
-            $sql = $pdo->prepare("INSERT INTO ranking VALUES (null, ?, ?, ?)");
-            $sql->execute(array($user, $pontuacao, $data));
-            $_SESSION['mensagem'] = "Pontuação salva no ranking!";
-        } catch (PDOException $erro) {
-            $_SESSION['mensagem'] = "erro:" . $erro;
-        }
-    }
-}
+$token = $_SESSION['TOKEN'];
+$wsUrl = wsUrl();
 ?>
-
 <!DOCTYPE html>
 <html lang="pt-br">
-
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dekership</title>
+    <title>Dekership - Game 1v1</title>
+    <link rel="stylesheet" href="web/assets/tailwind.css">
     <link rel="stylesheet" href="web/game/game.css">
-    <script type="text/javascript" src="web/game/game.js"></script>
-    <style>
-        input {
-            background: transparent;
-            border: none;
-            outline: none;
-        }
-    </style>
 </head>
-
 <body>
-    <?php include 'header.php'; ?>
-    <main class="main" id="main">
-        <div class="conteiner">
-            <!--HEADER-------------------------------->
-            <div class="header">
-                <h1>Dekership </h1>
-                <p>Controles: Setas ou AWSD • Tiro: Espaço • Correr: Shift pressionado</p>
-            </div>
-            <!--PRINCIPAL-------------------------------->
-            <div class="principal" id="omg">
-                <div id="painel" class="painel">
-                    <p class="vida">Vida:</p>
-                    <div id="medidorPlaneta">
-                        <div id="barraPlaneta"></div>
-                    </div>
-
-                    <form class="form" id="meuFormulario" method="POST">
-                        <div class="item-form">
-                            <label for="usuario">Jogador: </label>
-                            <input id="usuario" width="10pt" name="usuario" readonly="readonly"
-                                value="<?php echo $usuario['usuario']; ?>"></input>
-                        </div>
-
-                        <div class="item-form">
-                            <label for="pontuacao">Pontuação: </label>
-                            <input id="pontuacao" width="10px" name="pontuacao" readonly="readonly"></input>
-                        </div>
-
-                        <button type="submit" name="submit" id="submitBtn"></button>
-                        <div id="contBombas"></div>
-                    </form>
-                </div>
-
-                <div id="telaMsg" class="telaMsg">
-                    <p id="telaMsgTxt"></p>
-                    <button id="btnJogar" class="btnJogar">JOGAR</button>
-                </div>
-
-                <div id="naveJog" class="navJog"></div>
-
-            </div>
-
+<?php include 'header.php'; ?>
+<div class="container">
+    <div class="card">
+        <div class="row" style="justify-content: space-between;">
+            <h2 style="margin: 0;">Partida 1v1</h2>
+            <button id="leaveBtn" class="btn btn-danger" type="button">Voltar ao lobby</button>
         </div>
-    </main>
-
+        <p id="statusText">Conectando...</p>
+        <div class="row" style="gap: 24px;">
+            <div>Voc�: <strong id="myScore">0</strong></div>
+            <div>Oponente: <strong id="enemyScore">0</strong></div>
+        </div>
+        <canvas id="gameCanvas" width="900" height="420"></canvas>
+    </div>
+</div>
+<script>
+window.DEKERSHIP_GAME_CFG = {
+    token: <?= json_encode($token) ?>,
+    wsUrl: <?= json_encode($wsUrl) ?>,
+    roomId: localStorage.getItem('dk_room_id') || '',
+    matchId: localStorage.getItem('dk_match_id') || ''
+};
+</script>
+<script src="web/game/game.js"></script>
 </body>
-
 </html>
