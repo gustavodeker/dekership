@@ -16,6 +16,9 @@
 - Estado `ready`: sala com 2 jogadores.
 - Estado `playing`: partida em andamento.
 - Estado `finished`: vencedor definido.
+- Ao receber `match_start`, exibir countdown visual `3, 2, 1, GO!` no centro.
+- Durante countdown + `GO!` (1s), input do jogador fica bloqueado.
+- Countdown aparece 1 vez por `match_id` (nao repetir em recarga/reconexao da mesma partida).
 
 ## Condicoes de encerramento
 - Vitoria por 3 hits.

@@ -129,6 +129,7 @@ body.game-page .content {
 }
 
 body.game-page .game-panel {
+  position: relative;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -219,5 +220,21 @@ body.game-page .game-panel {
   background: linear-gradient(180deg, #09111d, #102338);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
+}
+
+.game-start-overlay {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 180px;
+  text-align: center;
+  font-size: 5rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 0 8px 28px rgba(0, 0, 0, 0.65);
+  pointer-events: none;
+  z-index: 5;
 }
 

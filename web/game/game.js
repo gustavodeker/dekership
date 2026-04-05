@@ -3,6 +3,7 @@ const context = canvas.getContext('2d');
 const statusNode = document.getElementById('game-status');
 const scoreSelf = document.getElementById('score-self');
 const scoreOpponent = document.getElementById('score-opponent');
+const startOverlayNode = document.getElementById('game-start-overlay');
 const DESIGN_WIDTH = canvas.width;
 const DESIGN_HEIGHT = canvas.height;
 
@@ -20,6 +21,9 @@ let pendingShot = false;
 let flushTimer = null;
 let resizeHandle = null;
 let matchStarted = false;
+let startCountdownInterval = null;
+let startOverlayTimeout = null;
+let controlsLocked = false;
 
 function applyCanvasScale() {
   const panel = canvas.closest('.game-panel');
@@ -48,6 +52,63 @@ function scheduleCanvasScale() {
     resizeHandle = null;
     applyCanvasScale();
   });
+}
+
+function clearStartOverlayTimers() {
+  if (startCountdownInterval !== null) {
+    clearInterval(startCountdownInterval);
+    startCountdownInterval = null;
+  }
+  if (startOverlayTimeout !== null) {
+    clearTimeout(startOverlayTimeout);
+    startOverlayTimeout = null;
+  }
+}
+
+function hideStartOverlay() {
+  if (!startOverlayNode) return;
+  startOverlayNode.hidden = true;
+  startOverlayNode.textContent = '';
+}
+
+function startMatchCountdown() {
+  if (!startOverlayNode) return;
+  clearStartOverlayTimers();
+  controlsLocked = true;
+  pendingShot = false;
+
+  let count = 3;
+  startOverlayNode.hidden = false;
+  startOverlayNode.textContent = String(count);
+
+  startCountdownInterval = window.setInterval(() => {
+    count -= 1;
+    if (count > 0) {
+      startOverlayNode.textContent = String(count);
+      return;
+    }
+
+    clearStartOverlayTimers();
+    startOverlayNode.textContent = 'GO!';
+    startOverlayTimeout = window.setTimeout(() => {
+      hideStartOverlay();
+      controlsLocked = false;
+      startOverlayTimeout = null;
+    }, 1000);
+  }, 1000);
+}
+
+function countdownShownStorageKey(matchId) {
+  return `dk_match_countdown_shown_${matchId}`;
+}
+
+function shouldShowStartCountdown(matchId) {
+  if (!matchId) return true;
+  const key = countdownShownStorageKey(matchId);
+  const alreadyShown = localStorage.getItem(key) === '1';
+  if (alreadyShown) return false;
+  localStorage.setItem(key, '1');
+  return true;
 }
 
 async function fetchSession() {
@@ -82,6 +143,7 @@ function currentMoveY() {
 }
 
 function sendInput(shoot = false) {
+  if (controlsLocked) return;
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   send('player_input', {
     seq: ++inputSeq,
@@ -170,6 +232,7 @@ function syncPointerFromEvent(event) {
 }
 
 function scheduleInput() {
+  if (controlsLocked) return;
   const now = performance.now();
   const elapsed = now - lastSentAt;
   if (pendingShot || elapsed >= 33) {
@@ -291,9 +354,16 @@ async function connect() {
     }
 
     if (event === 'match_start') {
-      localStorage.setItem('dk_match_id', payload.match_id);
+      const matchId = payload.match_id;
+      localStorage.setItem('dk_match_id', matchId);
       matchStarted = true;
-      statusNode.textContent = 'Partida iniciada';
+      statusNode.textContent = 'Partida iniciando...';
+      if (shouldShowStartCountdown(matchId)) {
+        startMatchCountdown();
+      } else {
+        controlsLocked = false;
+        hideStartOverlay();
+      }
       return;
     }
 
@@ -307,6 +377,9 @@ async function connect() {
     }
 
     if (event === 'match_end') {
+      clearStartOverlayTimers();
+      controlsLocked = false;
+      hideStartOverlay();
       const won = Number(payload.winner_user_id) === Number(myUserId);
       statusNode.textContent = won ? 'Vitória' : 'Derrota';
       localStorage.removeItem('dk_room_id');

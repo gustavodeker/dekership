@@ -24,6 +24,8 @@
 5. Validacao
 - 2 clientes na mesma sala.
 - Inicio automatico com 2 jogadores.
+- Countdown de inicio (`3,2,1,GO!`) aparece so uma vez por partida.
+- Durante countdown/GO, movimento e tiro ficam bloqueados.
 - Fim no terceiro hit.
 - Ranking/perfil atualizados em `player_stats`.
 - Se o navegador mantiver estado antigo, limpar `localStorage` (`dk_room_id`, `dk_match_id`) e recarregar.

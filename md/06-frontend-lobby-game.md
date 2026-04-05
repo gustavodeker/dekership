@@ -12,6 +12,9 @@
   - Canvas/area de jogo (base `1366x768`)
   - Escala dinamica com proporcao fixa (fit por viewport, sem rolagem vertical)
   - HUD no header (`Partida`, status, `Voce` e `Oponente`)
+  - Overlay central de inicio: `3`, `2`, `1`, `GO!` (GO por 1 segundo)
+  - Input bloqueado ate fim do `GO!`
+  - Countdown mostrado apenas 1 vez por `match_id` (nao repetir em recarregar/reconectar)
   - Movimento em 8 direcoes
   - Mira pelo mouse
   - Disparo no clique esquerdo
@@ -34,13 +37,14 @@
    - Se ja estiver em sala propria e clicar `Entrar` em outra, a sala atual e desfeita automaticamente.
    - Se criador clicar `Sair da sala`, sala e encerrada para todos.
 4. Receber `match_start`.
-5. Durante `playing`, enviar `player_input`.
-6. Renderizar estados recebidos por `state`.
+5. Rodar countdown inicial (primeira vez do `match_id`) e liberar controle no fim do `GO!`.
+6. Durante `playing`, enviar `player_input`.
+7. Renderizar estados recebidos por `state`.
    - Incluir render de `obstacles` e colisao visual com cobertura.
    - Interpolar nave e projetil entre snapshots.
    - Parear projetil por `projectile_id` (nao por indice).
-7. Ao `match_end`, mostrar resultado e voltar para lobby.
-8. Tratar `room_closed` para limpar estado local de sala (`dk_room_id`/`dk_match_id`) e atualizar lista.
+8. Ao `match_end`, mostrar resultado e voltar para lobby.
+9. Tratar `room_closed` para limpar estado local de sala (`dk_room_id`/`dk_match_id`) e atualizar lista.
 
 ## Controles do game
 - `WASD` ou setas: mover

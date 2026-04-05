@@ -7,6 +7,7 @@ render_header('Game');
 ?>
 <section class="panel game-panel">
     <canvas id="game-canvas" width="1366" height="768"></canvas>
+    <div id="game-start-overlay" class="game-start-overlay" aria-live="polite" hidden></div>
 </section>
 <script>
 window.DK_SESSION = <?= json_encode([
