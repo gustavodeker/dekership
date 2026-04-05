@@ -3,6 +3,8 @@ const context = canvas.getContext('2d');
 const statusNode = document.getElementById('game-status');
 const scoreSelf = document.getElementById('score-self');
 const scoreOpponent = document.getElementById('score-opponent');
+const DESIGN_WIDTH = canvas.width;
+const DESIGN_HEIGHT = canvas.height;
 
 let ws;
 let requestId = 0;
@@ -14,6 +16,36 @@ const pointer = { x: 50, y: 50 };
 let lastSentAt = 0;
 let pendingShot = false;
 let flushTimer = null;
+let resizeHandle = null;
+
+function applyCanvasScale() {
+  const panel = canvas.closest('.game-panel');
+  if (!panel) return;
+
+  const panelStyle = window.getComputedStyle(panel);
+  const paddingLeft = parseFloat(panelStyle.paddingLeft) || 0;
+  const paddingRight = parseFloat(panelStyle.paddingRight) || 0;
+  const paddingBottom = parseFloat(panelStyle.paddingBottom) || 0;
+  const canvasRect = canvas.getBoundingClientRect();
+  const panelRect = panel.getBoundingClientRect();
+
+  const availableWidth = Math.max(1, panel.clientWidth - paddingLeft - paddingRight);
+  const availableHeight = Math.max(1, panelRect.bottom - canvasRect.top - paddingBottom);
+  const scale = Math.min(availableWidth / DESIGN_WIDTH, availableHeight / DESIGN_HEIGHT);
+
+  canvas.style.width = `${Math.floor(DESIGN_WIDTH * scale)}px`;
+  canvas.style.height = `${Math.floor(DESIGN_HEIGHT * scale)}px`;
+}
+
+function scheduleCanvasScale() {
+  if (resizeHandle !== null) {
+    cancelAnimationFrame(resizeHandle);
+  }
+  resizeHandle = requestAnimationFrame(() => {
+    resizeHandle = null;
+    applyCanvasScale();
+  });
+}
 
 async function fetchSession() {
   const response = await fetch(window.DK_SESSION.sessionEndpoint, { credentials: 'same-origin' });
@@ -223,6 +255,10 @@ canvas.addEventListener('mousedown', (event) => {
   pendingShot = true;
   scheduleInput();
 });
+
+window.addEventListener('resize', scheduleCanvasScale);
+window.addEventListener('orientationchange', scheduleCanvasScale);
+scheduleCanvasScale();
 
 connect();
 render();

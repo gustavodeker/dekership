@@ -82,6 +82,61 @@ input {
   padding: 1.5rem;
 }
 
+body.game-page {
+  overflow: hidden;
+}
+
+body.game-page .layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+body.game-page .topbar {
+  padding: 0.5rem 0.75rem;
+  gap: 0.5rem;
+}
+
+body.game-page .brand {
+  font-size: 1rem;
+}
+
+body.game-page .nav {
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+body.game-page .game-header-hud {
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+body.game-page .game-header-line {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+body.game-page .content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0.4rem;
+}
+
+body.game-page .game-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+}
+
 .panel {
   background: linear-gradient(180deg, rgba(27, 45, 72, 0.9), rgba(19, 32, 52, 0.95));
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -156,9 +211,13 @@ input {
 }
 
 #game-canvas {
-  width: 100%;
-  max-width: 900px;
+  display: block;
+  margin: 0;
+  width: 1366px;
+  height: 768px;
+  max-width: none;
   background: linear-gradient(180deg, #09111d, #102338);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
 }
+

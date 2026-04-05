@@ -9,8 +9,9 @@
   - Jogadores conectados
   - Status `Aguardando jogador` / `Partida iniciando`
 - Game:
-  - Canvas/area de jogo
-  - HUD de hits (0 a 3)
+  - Canvas/area de jogo (base `1366x768`)
+  - Escala dinamica com proporcao fixa (fit por viewport, sem rolagem vertical)
+  - HUD no header (`Partida`, status, `Voce` e `Oponente`)
   - Movimento em 8 direcoes
   - Mira pelo mouse
   - Disparo no clique esquerdo
