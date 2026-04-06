@@ -37,11 +37,12 @@ $_SESSION['auth_user']['token'] = $freshToken;
 $renderSmoothing = 0.25;
 $playerHitboxRadius = 5.4;
 $projectileHitboxRadius = 0.6;
+$showHitbox = true;
 try {
     $settingStmt = db()->prepare(
         "SELECT setting_key, setting_value
          FROM game_settings
-         WHERE setting_key IN ('render_smoothing', 'player_hitbox_radius', 'projectile_hitbox_radius')"
+         WHERE setting_key IN ('render_smoothing', 'player_hitbox_radius', 'projectile_hitbox_radius', 'show_hitbox')"
     );
     $settingStmt->execute();
     $settings = $settingStmt->fetchAll(PDO::FETCH_KEY_PAIR);
@@ -54,10 +55,14 @@ try {
     if (isset($settings['projectile_hitbox_radius'])) {
         $projectileHitboxRadius = (float) $settings['projectile_hitbox_radius'];
     }
+    if (isset($settings['show_hitbox'])) {
+        $showHitbox = (string) $settings['show_hitbox'] !== '0';
+    }
 } catch (Throwable $throwable) {
     $renderSmoothing = 0.25;
     $playerHitboxRadius = 5.4;
     $projectileHitboxRadius = 0.6;
+    $showHitbox = true;
 }
 $renderSmoothing = max(0.0, min(1.0, $renderSmoothing));
 $playerHitboxRadius = max(0.1, $playerHitboxRadius);
@@ -72,6 +77,7 @@ echo json_encode([
     'render_smoothing' => $renderSmoothing,
     'player_hitbox_radius' => $playerHitboxRadius,
     'projectile_hitbox_radius' => $projectileHitboxRadius,
+    'show_hitbox' => $showHitbox,
     'ws_url' => app_config()['ws_url'],
 ], JSON_UNESCAPED_SLASHES);
 

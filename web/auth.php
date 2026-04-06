@@ -121,7 +121,8 @@ function ensure_admin_schema(): void
         ('hits_to_win', '3'),
         ('render_smoothing', '0.25'),
         ('player_hitbox_radius', '5.4'),
-        ('projectile_hitbox_radius', '0.6')
+        ('projectile_hitbox_radius', '0.6'),
+        ('show_hitbox', '1')
         ON DUPLICATE KEY UPDATE setting_value = setting_value"
     );
 

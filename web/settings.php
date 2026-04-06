@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $renderSmoothing = (float) ($_POST['render_smoothing'] ?? 0.25);
             $playerHitboxRadius = (float) ($_POST['player_hitbox_radius'] ?? 5.4);
             $projectileHitboxRadius = (float) ($_POST['projectile_hitbox_radius'] ?? 0.6);
+            $showHitbox = isset($_POST['show_hitbox']) ? 1 : 0;
 
             if (
                 $projectileSpeed <= 0
@@ -41,6 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute(['setting_key' => 'render_smoothing', 'setting_value' => (string) $renderSmoothing]);
             $stmt->execute(['setting_key' => 'player_hitbox_radius', 'setting_value' => (string) $playerHitboxRadius]);
             $stmt->execute(['setting_key' => 'projectile_hitbox_radius', 'setting_value' => (string) $projectileHitboxRadius]);
+            $stmt->execute(['setting_key' => 'show_hitbox', 'setting_value' => (string) $showHitbox]);
             $success = 'Configuracoes salvas';
         }
 
@@ -129,6 +131,10 @@ render_header('Configuracoes');
             <label>
                 <span>Hitbox do projetil</span>
                 <input type="number" step="0.1" min="0.1" name="projectile_hitbox_radius" value="<?= htmlspecialchars((string) ($settings['projectile_hitbox_radius'] ?? '0.6'), ENT_QUOTES, 'UTF-8') ?>" required>
+            </label>
+            <label>
+                <span>Mostrar linha de hitbox</span>
+                <input type="checkbox" name="show_hitbox" value="1" <?= (($settings['show_hitbox'] ?? '1') === '1') ? 'checked' : '' ?>>
             </label>
             <button type="submit" name="save_settings" value="1">Salvar</button>
         </form>

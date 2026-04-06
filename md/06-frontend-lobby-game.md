@@ -17,7 +17,7 @@
   - Overlay central ao encerrar partida: `Vitoria!` ou `Derrota!` + `Saindo em 3... 2... 1...`
   - Feedback de hit no centro: `Hit!` por 1s (verde para atacante, vermelho para alvo)
   - Hit stop curto no impacto (`55ms`)
-  - Flash de impacto por jogador (`~110ms`; verde claro atacante, vermelho claro alvo)
+  - Flash de impacto apenas no alvo (`~110ms`; vermelho claro)
   - Knockback visual no alvo (`16px`, decaimento em `140ms`, sem alterar estado autoritativo)
   - Input bloqueado durante o countdown de saida
   - Countdown mostrado apenas 1 vez por `match_id` (nao repetir em recarregar/reconectar)
@@ -25,6 +25,7 @@
   - Mira pelo mouse
   - Disparo no clique esquerdo
   - Obstaculos renderizados no mapa para cover e rotas
+  - Nave renderizada por sprite PNG (`/web/assets/ship.png`) com rotacao em tempo real
   - Nome dos dois jogadores renderizado acima da nave em tempo real
 - Perfil:
   - Vitorias, derrotas, desconexoes
@@ -36,6 +37,7 @@
   - Ajuste de vida (`hits_to_win`)
   - Ajuste de suavizacao visual (`render_smoothing` 0..1)
   - Ajuste de hitbox da nave e do projetil
+  - Toggle para mostrar/ocultar linha de hitbox no cliente (`show_hitbox`)
   - Controle de privilegio admin por usuario
 
 ## Fluxo no cliente
@@ -58,7 +60,7 @@
 - `WASD` ou setas: mover
 - Mouse: mirar
 - Clique esquerdo: atirar
-- Nave renderizada com rotacao em tempo real
+- Nave renderizada por sprite PNG com rotacao em tempo real
 - Nome do jogador acompanha a nave em tempo real
 
 ## Organizacao de arquivos sugerida

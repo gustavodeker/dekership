@@ -27,11 +27,27 @@ let endCountdownInterval = null;
 let controlsLocked = false;
 let playerHitRadius = 5.4;
 let projectileHitRadius = 0.6;
+let showHitbox = true;
 let hitFeedbackUntil = 0;
 let hitFeedbackColor = '#22c55e';
 let hitStopUntil = 0;
 const playerFlashEffects = new Map();
 const playerKnockbackEffects = new Map();
+const shipSprite = new Image();
+let shipSpriteReady = false;
+const SHIP_RENDER_WIDTH = 52;
+const SHIP_RENDER_HEIGHT = 52;
+const SHIP_SPRITE_ANGLE_OFFSET = 0;
+
+shipSprite.addEventListener('load', () => {
+  shipSpriteReady = true;
+});
+
+shipSprite.addEventListener('error', () => {
+  shipSpriteReady = false;
+});
+
+shipSprite.src = '/web/assets/ship.png';
 
 function applyCanvasScale() {
   const panel = canvas.closest('.game-panel');
@@ -173,6 +189,9 @@ async function fetchSession() {
   }
   if (typeof data.projectile_hitbox_radius === 'number') {
     projectileHitRadius = Math.max(0.1, data.projectile_hitbox_radius);
+  }
+  if (typeof data.show_hitbox === 'boolean') {
+    showHitbox = data.show_hitbox;
   }
   return data;
 }
@@ -316,24 +335,49 @@ function drawPlayer(player, color) {
 
   context.save();
   context.translate(x, y);
-  context.rotate(angle);
-  context.fillStyle = flash ? flash.color : color;
-  context.beginPath();
-  context.moveTo(22, 0);
-  context.lineTo(-16, -12);
-  context.lineTo(-10, 0);
-  context.lineTo(-16, 12);
-  context.closePath();
-  context.fill();
+  context.rotate(angle + SHIP_SPRITE_ANGLE_OFFSET);
+
+  if (shipSpriteReady) {
+    context.drawImage(
+      shipSprite,
+      -SHIP_RENDER_WIDTH / 2,
+      -SHIP_RENDER_HEIGHT / 2,
+      SHIP_RENDER_WIDTH,
+      SHIP_RENDER_HEIGHT
+    );
+
+    if (flash) {
+      context.save();
+      context.globalCompositeOperation = 'source-atop';
+      context.globalAlpha = 0.5;
+      context.fillStyle = flash.color;
+      context.beginPath();
+      context.arc(0, 0, Math.min(SHIP_RENDER_WIDTH, SHIP_RENDER_HEIGHT) * 0.3, 0, Math.PI * 2);
+      context.fill();
+      context.restore();
+    }
+  } else {
+    context.fillStyle = flash ? flash.color : color;
+    context.beginPath();
+    context.moveTo(22, 0);
+    context.lineTo(-16, -12);
+    context.lineTo(-10, 0);
+    context.lineTo(-16, 12);
+    context.closePath();
+    context.fill();
+  }
+
   context.restore();
 
-  context.save();
-  context.strokeStyle = 'rgba(34, 197, 94, 0.7)';
-  context.lineWidth = 2;
-  context.beginPath();
-  context.arc(x, y, arenaRadiusToCanvasRadius(playerHitRadius), 0, Math.PI * 2);
-  context.stroke();
-  context.restore();
+  if (showHitbox) {
+    context.save();
+    context.strokeStyle = 'rgba(34, 197, 94, 0.7)';
+    context.lineWidth = 2;
+    context.beginPath();
+    context.arc(x, y, arenaRadiusToCanvasRadius(playerHitRadius), 0, Math.PI * 2);
+    context.stroke();
+    context.restore();
+  }
 
   if (player.username) {
     context.save();
@@ -357,13 +401,15 @@ function drawProjectile(projectile) {
   context.arc(x, y, 4, 0, Math.PI * 2);
   context.fill();
 
-  context.save();
-  context.strokeStyle = 'rgba(245, 158, 11, 0.9)';
-  context.lineWidth = 1.5;
-  context.beginPath();
-  context.arc(x, y, arenaRadiusToCanvasRadius(projectileHitRadius), 0, Math.PI * 2);
-  context.stroke();
-  context.restore();
+  if (showHitbox) {
+    context.save();
+    context.strokeStyle = 'rgba(245, 158, 11, 0.9)';
+    context.lineWidth = 1.5;
+    context.beginPath();
+    context.arc(x, y, arenaRadiusToCanvasRadius(projectileHitRadius), 0, Math.PI * 2);
+    context.stroke();
+    context.restore();
+  }
 }
 
 function drawObstacle(obstacle) {
@@ -546,7 +592,6 @@ async function connect() {
       const attackerId = Number(payload.attacker);
       const targetId = Number(payload.target);
       startHitStop();
-      setPlayerFlash(attackerId, '#86efac');
       setPlayerFlash(targetId, '#fca5a5');
       applyPlayerKnockback(attackerId, targetId);
 

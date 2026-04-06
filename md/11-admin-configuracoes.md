@@ -12,6 +12,7 @@
 - `render_smoothing`: fator de suavizacao visual no cliente (`0..1`).
 - `player_hitbox_radius`: raio da hitbox da nave.
 - `projectile_hitbox_radius`: raio da hitbox do projetil.
+- `show_hitbox`: habilita/oculta linha de hitbox visivel no cliente (`1`/`0`).
 - Persistencia em `game_settings`.
 
 ## Regras operacionais
