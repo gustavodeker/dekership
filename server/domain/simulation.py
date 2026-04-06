@@ -73,6 +73,7 @@ class SimulationService:
     async def _apply_inputs(self, room, match: MatchState) -> None:
         game_settings = await self.game_config.get_settings()
         movement_speed = game_settings["movement_speed"]
+        fire_cooldown_ticks = max(1, int(game_settings["fire_cooldown_ticks"]))
         for player_state in room.players.values():
             match_player = match.players[player_state.user_id]
             next_x = max(
@@ -92,7 +93,7 @@ class SimulationService:
             match_player.aim_y = player_state.aim_y
             if player_state.shoot_requested:
                 player_state.shoot_requested = False
-                if (match.tick - match_player.last_shot_tick) >= 6:
+                if (match.tick - match_player.last_shot_tick) >= fire_cooldown_ticks:
                     delta_x = match_player.aim_x - match_player.x
                     delta_y = match_player.aim_y - match_player.y
                     distance = math.hypot(delta_x, delta_y) or 1.0

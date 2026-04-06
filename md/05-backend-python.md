@@ -42,6 +42,7 @@ server/
 - Persistencia no fim da partida em transacao unica.
 - Leitura periodica de `projectile_speed` e `movement_speed` sem reiniciar processo.
 - Leitura periodica de `hits_to_win` sem reiniciar processo.
+- Leitura periodica de `fire_cooldown_ticks` sem reiniciar processo.
 - Leitura periodica de `player_hitbox_radius` e `projectile_hitbox_radius` sem reiniciar processo.
 - Bootstrap automatico de `game_settings` e `game_admin` no startup.
 - Estado da partida inclui obstaculos fixos para cobertura e bloqueio de rota.

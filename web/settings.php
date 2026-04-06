@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $projectileSpeed = (float) ($_POST['projectile_speed'] ?? 1.6);
             $movementSpeed = (float) ($_POST['movement_speed'] ?? 3.0);
             $hitsToWin = (int) ($_POST['hits_to_win'] ?? 3);
+            $fireCooldownTicks = (int) ($_POST['fire_cooldown_ticks'] ?? 6);
             $renderSmoothing = (float) ($_POST['render_smoothing'] ?? 0.25);
             $playerHitboxRadius = (float) ($_POST['player_hitbox_radius'] ?? 5.4);
             $projectileHitboxRadius = (float) ($_POST['projectile_hitbox_radius'] ?? 0.6);
@@ -23,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $projectileSpeed <= 0
                 || $movementSpeed <= 0
                 || $hitsToWin <= 0
+                || $fireCooldownTicks <= 0
                 || $renderSmoothing < 0
                 || $renderSmoothing > 1
                 || $playerHitboxRadius <= 0
@@ -39,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute(['setting_key' => 'projectile_speed', 'setting_value' => (string) $projectileSpeed]);
             $stmt->execute(['setting_key' => 'movement_speed', 'setting_value' => (string) $movementSpeed]);
             $stmt->execute(['setting_key' => 'hits_to_win', 'setting_value' => (string) $hitsToWin]);
+            $stmt->execute(['setting_key' => 'fire_cooldown_ticks', 'setting_value' => (string) $fireCooldownTicks]);
             $stmt->execute(['setting_key' => 'render_smoothing', 'setting_value' => (string) $renderSmoothing]);
             $stmt->execute(['setting_key' => 'player_hitbox_radius', 'setting_value' => (string) $playerHitboxRadius]);
             $stmt->execute(['setting_key' => 'projectile_hitbox_radius', 'setting_value' => (string) $projectileHitboxRadius]);
@@ -119,6 +122,10 @@ render_header('Configuracoes');
             <label>
                 <span>Vida (acertos para vencer)</span>
                 <input type="number" step="1" min="1" name="hits_to_win" value="<?= htmlspecialchars((string) ($settings['hits_to_win'] ?? '3'), ENT_QUOTES, 'UTF-8') ?>" required>
+            </label>
+            <label>
+                <span>Intervalo entre disparos por clique (ticks)</span>
+                <input type="number" step="1" min="1" name="fire_cooldown_ticks" value="<?= htmlspecialchars((string) ($settings['fire_cooldown_ticks'] ?? '6'), ENT_QUOTES, 'UTF-8') ?>" required>
             </label>
             <label>
                 <span>Suavizacao visual (0-1)</span>
