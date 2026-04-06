@@ -16,6 +16,9 @@
   - Input bloqueado ate fim do `GO!`
   - Overlay central ao encerrar partida: `Vitoria!` ou `Derrota!` + `Saindo em 3... 2... 1...`
   - Feedback de hit no centro: `Hit!` por 1s (verde para atacante, vermelho para alvo)
+  - Hit stop curto no impacto (`55ms`)
+  - Flash de impacto por jogador (`~110ms`; verde claro atacante, vermelho claro alvo)
+  - Knockback visual no alvo (`16px`, decaimento em `140ms`, sem alterar estado autoritativo)
   - Input bloqueado durante o countdown de saida
   - Countdown mostrado apenas 1 vez por `match_id` (nao repetir em recarregar/reconectar)
   - Movimento em 8 direcoes

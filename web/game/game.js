@@ -29,6 +29,9 @@ let playerHitRadius = 5.4;
 let projectileHitRadius = 0.6;
 let hitFeedbackUntil = 0;
 let hitFeedbackColor = '#22c55e';
+let hitStopUntil = 0;
+const playerFlashEffects = new Map();
+const playerKnockbackEffects = new Map();
 
 function applyCanvasScale() {
   const panel = canvas.closest('.game-panel');
@@ -305,14 +308,16 @@ function scheduleInput() {
 }
 
 function drawPlayer(player, color) {
-  const x = arenaToCanvasX(player.x);
-  const y = arenaToCanvasY(player.y);
+  const flash = getPlayerFlash(player.user_id);
+  const knockback = getPlayerKnockbackOffset(player.user_id);
+  const x = arenaToCanvasX(player.x) + knockback.x;
+  const y = arenaToCanvasY(player.y) + knockback.y;
   const angle = Math.atan2(player.aim_y - player.y, player.aim_x - player.x);
 
   context.save();
   context.translate(x, y);
   context.rotate(angle);
-  context.fillStyle = color;
+  context.fillStyle = flash ? flash.color : color;
   context.beginPath();
   context.moveTo(22, 0);
   context.lineTo(-16, -12);
@@ -384,6 +389,72 @@ function showHitFeedback(color) {
   hitFeedbackUntil = performance.now() + 1000;
 }
 
+function startHitStop(durationMs = 55) {
+  hitStopUntil = Math.max(hitStopUntil, performance.now() + durationMs);
+}
+
+function findPlayerByUserId(snapshot, userId) {
+  if (!snapshot) return null;
+  if (Number(snapshot.p1?.user_id) === Number(userId)) return snapshot.p1;
+  if (Number(snapshot.p2?.user_id) === Number(userId)) return snapshot.p2;
+  return null;
+}
+
+function setPlayerFlash(userId, color, durationMs = 110) {
+  if (!Number.isFinite(Number(userId))) return;
+  playerFlashEffects.set(Number(userId), {
+    color,
+    until: performance.now() + durationMs,
+  });
+}
+
+function getPlayerFlash(userId) {
+  const key = Number(userId);
+  const effect = playerFlashEffects.get(key);
+  if (!effect) return null;
+  if (performance.now() > effect.until) {
+    playerFlashEffects.delete(key);
+    return null;
+  }
+  return effect;
+}
+
+function applyPlayerKnockback(attackerId, targetId, strengthPx = 16, durationMs = 140) {
+  const snapshot = state || renderState;
+  const attacker = findPlayerByUserId(snapshot, attackerId);
+  const target = findPlayerByUserId(snapshot, targetId);
+  if (!attacker || !target) return;
+
+  const deltaX = target.x - attacker.x;
+  const deltaY = target.y - attacker.y;
+  const distance = Math.hypot(deltaX, deltaY) || 1;
+
+  playerKnockbackEffects.set(Number(targetId), {
+    offsetX: (deltaX / distance) * strengthPx,
+    offsetY: (deltaY / distance) * strengthPx,
+    startedAt: performance.now(),
+    durationMs,
+  });
+}
+
+function getPlayerKnockbackOffset(userId) {
+  const key = Number(userId);
+  const effect = playerKnockbackEffects.get(key);
+  if (!effect) return { x: 0, y: 0 };
+
+  const elapsed = performance.now() - effect.startedAt;
+  if (elapsed >= effect.durationMs) {
+    playerKnockbackEffects.delete(key);
+    return { x: 0, y: 0 };
+  }
+
+  const intensity = 1 - (elapsed / effect.durationMs);
+  return {
+    x: effect.offsetX * intensity,
+    y: effect.offsetY * intensity,
+  };
+}
+
 function drawHitFeedback() {
   if (performance.now() > hitFeedbackUntil) return;
   context.save();
@@ -399,6 +470,11 @@ function drawHitFeedback() {
 }
 
 function render() {
+  if (performance.now() < hitStopUntil) {
+    requestAnimationFrame(render);
+    return;
+  }
+
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = '#17324f';
   context.fillRect(0, 0, canvas.width, canvas.height);
@@ -467,6 +543,13 @@ async function connect() {
     }
 
     if (event === 'hit') {
+      const attackerId = Number(payload.attacker);
+      const targetId = Number(payload.target);
+      startHitStop();
+      setPlayerFlash(attackerId, '#86efac');
+      setPlayerFlash(targetId, '#fca5a5');
+      applyPlayerKnockback(attackerId, targetId);
+
       if (Number(payload.attacker) === Number(myUserId)) {
         showHitFeedback('#22c55e');
       } else if (Number(payload.target) === Number(myUserId)) {
