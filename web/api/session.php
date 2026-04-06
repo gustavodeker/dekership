@@ -38,11 +38,12 @@ $renderSmoothing = 0.25;
 $playerHitboxRadius = 5.4;
 $projectileHitboxRadius = 0.6;
 $showHitbox = true;
+$wsMode = 'vps';
 try {
     $settingStmt = db()->prepare(
         "SELECT setting_key, setting_value
          FROM game_settings
-         WHERE setting_key IN ('render_smoothing', 'player_hitbox_radius', 'projectile_hitbox_radius', 'show_hitbox')"
+         WHERE setting_key IN ('render_smoothing', 'player_hitbox_radius', 'projectile_hitbox_radius', 'show_hitbox', 'ws_mode')"
     );
     $settingStmt->execute();
     $settings = $settingStmt->fetchAll(PDO::FETCH_KEY_PAIR);
@@ -58,15 +59,26 @@ try {
     if (isset($settings['show_hitbox'])) {
         $showHitbox = (string) $settings['show_hitbox'] !== '0';
     }
+    if (isset($settings['ws_mode'])) {
+        $candidateWsMode = (string) $settings['ws_mode'];
+        if (in_array($candidateWsMode, ['vps', 'local'], true)) {
+            $wsMode = $candidateWsMode;
+        }
+    }
 } catch (Throwable $throwable) {
     $renderSmoothing = 0.25;
     $playerHitboxRadius = 5.4;
     $projectileHitboxRadius = 0.6;
     $showHitbox = true;
+    $wsMode = 'vps';
 }
 $renderSmoothing = max(0.0, min(1.0, $renderSmoothing));
 $playerHitboxRadius = max(0.1, $playerHitboxRadius);
 $projectileHitboxRadius = max(0.1, $projectileHitboxRadius);
+$configData = app_config();
+$wsUrl = $wsMode === 'local'
+    ? (string) $configData['ws_url_local']
+    : (string) $configData['ws_url_vps'];
 
 echo json_encode([
     'ok' => true,
@@ -78,6 +90,7 @@ echo json_encode([
     'player_hitbox_radius' => $playerHitboxRadius,
     'projectile_hitbox_radius' => $projectileHitboxRadius,
     'show_hitbox' => $showHitbox,
-    'ws_url' => app_config()['ws_url'],
+    'ws_mode' => $wsMode,
+    'ws_url' => $wsUrl,
 ], JSON_UNESCAPED_SLASHES);
 

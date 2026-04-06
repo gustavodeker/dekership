@@ -49,7 +49,7 @@
 - `pong`
   - payload: `{ "ts": 1712345678 }`
 - `error`
-  - payload: `{ "code": "ROOM_FULL|UNAUTHORIZED|INVALID_STATE|RATE_LIMIT", "message": "..." }`
+  - payload: `{ "code": "ROOM_FULL|UNAUTHORIZED|INVALID_STATE", "message": "..." }`
 
 ## Regras de sincronizacao
 - Se usuario ja estiver em sala e enviar `room_join` para outra, sala atual e desfeita antes da entrada na nova.
@@ -62,6 +62,7 @@
 - Se o timeout expirar, o oponente vence com `match_end.reason = "disconnect"`.
 - Cliente envia apenas input, nunca estado final.
 - Servidor usa `seq` para descartar input antigo.
+- Em `player_input`, pacote com `shoot=true` e priorizado e nao deve ser perdido por overwrite de input subsequente.
 - `state` enviado em intervalo fixo (ex.: 20-30 Hz).
 - Mira e movimento usam coordenadas normalizadas de arena (`0..100`).
 - Cliente trata `obstacles` como colisores solidos de mapa.

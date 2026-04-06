@@ -76,16 +76,26 @@ class SimulationService:
         fire_cooldown_ticks = max(1, int(game_settings["fire_cooldown_ticks"]))
         for player_state in room.players.values():
             match_player = match.players[player_state.user_id]
+            input_x = float(player_state.move_x)
+            input_y = float(player_state.move_y)
+            input_magnitude = math.hypot(input_x, input_y)
+            if input_magnitude > 0.0:
+                input_x /= input_magnitude
+                input_y /= input_magnitude
+
+            move_x = input_x * self.visual_x_axis_factor
+            move_y = input_y
+
             next_x = max(
                 self.arena_min_x,
-                min(self.arena_max_x, match_player.x + (player_state.move_x * movement_speed)),
+                min(self.arena_max_x, match_player.x + (move_x * movement_speed)),
             )
             if not self._collides_with_obstacle(next_x, match_player.y, self.player_collision_radius, match):
                 match_player.x = next_x
 
             next_y = max(
                 self.arena_min_y,
-                min(self.arena_max_y, match_player.y + (player_state.move_y * movement_speed)),
+                min(self.arena_max_y, match_player.y + (move_y * movement_speed)),
             )
             if not self._collides_with_obstacle(match_player.x, next_y, self.player_collision_radius, match):
                 match_player.y = next_y

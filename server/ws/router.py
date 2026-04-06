@@ -85,10 +85,6 @@ def build_ws_router(
                     await manager.send_error(websocket, "UNAUTHORIZED", "autenticacao obrigatoria")
                     continue
 
-                if envelope.event == "player_input" and not limiter.allow(authed_user.user_id):
-                    await manager.send_error(websocket, "RATE_LIMIT", "limite de input excedido")
-                    continue
-
                 if envelope.event == "room_list":
                     await manager.send_json(websocket, "room_list_result", {"rooms": await rooms.list_rooms()})
                     continue
@@ -173,6 +169,8 @@ def build_ws_router(
 
                 if envelope.event == "player_input":
                     payload = PlayerInputPayload.model_validate(envelope.payload)
+                    if not limiter.allow(authed_user.user_id) and not payload.shoot:
+                        continue
                     room = await rooms.get_room_for_user(authed_user.user_id)
                     if room is None or authed_user.user_id not in room.players:
                         await manager.send_error(websocket, "INVALID_STATE", "jogador sem sala")
@@ -185,7 +183,8 @@ def build_ws_router(
                     player.move_y = payload.move_y
                     player.aim_x = payload.aim_x
                     player.aim_y = payload.aim_y
-                    player.shoot_requested = payload.shoot
+                    if payload.shoot:
+                        player.shoot_requested = True
                     continue
 
                 if envelope.event == "ping":

@@ -47,6 +47,8 @@ server/
 - Bootstrap automatico de `game_settings` e `game_admin` no startup.
 - Estado da partida inclui obstaculos fixos para cobertura e bloqueio de rota.
 - Deteccao de hit de projetil usa distancia circular com correcao de aspecto visual.
+- Movimento aplica normalizacao de input e fator de aspecto no eixo X para velocidade visual consistente.
+- `shoot_requested` e tratado em latch no servidor para nao perder clique entre ticks.
 
 ## Endpoints HTTP auxiliares
 - `GET /health` para monitoramento.

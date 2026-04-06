@@ -11,7 +11,8 @@
 - `DB_NAME=dekership`
 - `DB_USER=externo`
 - `DB_PASS=Sistema@123`
-- `WS_URL=ws://192.168.1.9:8766/ws`
+- `WS_URL_VPS=wss://dekership.dataleave.com.br/ws`
+- `WS_URL_LOCAL=ws://127.0.0.1:8766/ws`
 
 ## Execucao local (venv em diante)
 1. Entrar na raiz do projeto:
@@ -74,7 +75,8 @@ uvicorn server.app:app --host 0.0.0.0 --port 8766
 - `DB_NAME=dekership`
 - `DB_USER=externo`
 - `DB_PASS=Sistema@123`
-- `WS_URL=wss://<seu-dominio>/ws`
+- `WS_URL_VPS=wss://<seu-dominio>/ws`
+- `WS_URL_LOCAL=ws://127.0.0.1:8766/ws`
 
 ### Execucao na VPS (venv em diante)
 1. Entrar no projeto:

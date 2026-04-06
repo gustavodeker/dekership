@@ -36,6 +36,7 @@
   - Ajuste de velocidade de projetil e movimento
   - Ajuste de vida (`hits_to_win`)
   - Ajuste de intervalo minimo entre disparos por clique (`fire_cooldown_ticks`)
+  - Seletor de WebSocket ativo (`ws_mode`: `VPS` ou `Local`)
   - Ajuste de suavizacao visual (`render_smoothing` 0..1)
   - Ajuste de hitbox da nave e do projetil
   - Toggle para mostrar/ocultar linha de hitbox no cliente (`show_hitbox`)

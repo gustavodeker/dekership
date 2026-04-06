@@ -120,6 +120,7 @@ function ensure_admin_schema(): void
         ('movement_speed', '3.0'),
         ('hits_to_win', '3'),
         ('fire_cooldown_ticks', '6'),
+        ('ws_mode', 'vps'),
         ('render_smoothing', '0.25'),
         ('player_hitbox_radius', '5.4'),
         ('projectile_hitbox_radius', '0.6'),
