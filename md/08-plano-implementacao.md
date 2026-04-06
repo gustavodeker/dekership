@@ -9,7 +9,7 @@
 - Concluido: autenticacao WS por token de sessao PHP.
 - Concluido: criar/listar/entrar sala.
 - Concluido: inicio automatico ao segundo jogador entrar.
-- Concluido: loop de jogo e regra de 3 hits.
+- Concluido: loop de jogo e regra de vitoria por vida configuravel.
 - Concluido: persistencia de resultado no banco.
 - Concluido: push automatico da lista de salas.
 - Concluido: leitura dinamica de configuracoes de gameplay.
@@ -33,7 +33,7 @@
 
 ## Criterios de aceite
 - Sala inicia automaticamente com 2 jogadores.
-- Partida termina no terceiro acerto.
+- Partida termina ao atingir `hits_to_win`.
 - Vencedor e perdedor persistidos corretamente.
 - Perfil mostra vitorias e derrotas corretas.
 - Ranking ordena por maior numero de vitorias.

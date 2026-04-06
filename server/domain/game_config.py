@@ -43,6 +43,7 @@ class GameConfigService:
                     VALUES
                       ('projectile_speed', '1.6'),
                       ('movement_speed', '3.0'),
+                      ('hits_to_win', '3'),
                       ('render_smoothing', '0.25'),
                       ('player_hitbox_radius', '5.4'),
                       ('projectile_hitbox_radius', '0.6')
@@ -70,6 +71,7 @@ class GameConfigService:
         return {
             "projectile_speed": float(self._cache.get("projectile_speed", "1.6")),
             "movement_speed": float(self._cache.get("movement_speed", "3.0")),
+            "hits_to_win": max(1, int(float(self._cache.get("hits_to_win", "3")))),
             "render_smoothing": float(self._cache.get("render_smoothing", "0.25")),
             "player_hitbox_radius": float(self._cache.get("player_hitbox_radius", "5.4")),
             "projectile_hitbox_radius": float(self._cache.get("projectile_hitbox_radius", "0.6")),

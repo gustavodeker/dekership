@@ -27,6 +27,8 @@ let endCountdownInterval = null;
 let controlsLocked = false;
 let playerHitRadius = 5.4;
 let projectileHitRadius = 0.6;
+let hitFeedbackUntil = 0;
+let hitFeedbackColor = '#22c55e';
 
 function applyCanvasScale() {
   const panel = canvas.closest('.game-panel');
@@ -377,6 +379,25 @@ function drawObstacle(obstacle) {
   );
 }
 
+function showHitFeedback(color) {
+  hitFeedbackColor = color;
+  hitFeedbackUntil = performance.now() + 1000;
+}
+
+function drawHitFeedback() {
+  if (performance.now() > hitFeedbackUntil) return;
+  context.save();
+  context.font = '700 48px Arial';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.lineWidth = 6;
+  context.strokeStyle = 'rgba(15, 23, 42, 0.85)';
+  context.fillStyle = hitFeedbackColor;
+  context.strokeText('Hit!', canvas.width / 2, canvas.height / 2);
+  context.fillText('Hit!', canvas.width / 2, canvas.height / 2);
+  context.restore();
+}
+
 function render() {
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = '#17324f';
@@ -392,6 +413,7 @@ function render() {
     scoreSelf.textContent = selfIsBottom ? state.score.p1 : state.score.p2;
     scoreOpponent.textContent = selfIsBottom ? state.score.p2 : state.score.p1;
   }
+  drawHitFeedback();
 
   requestAnimationFrame(render);
 }
@@ -441,6 +463,15 @@ async function connect() {
         renderState = cloneGameState(payload);
       }
       updateStatusFromState(payload);
+      return;
+    }
+
+    if (event === 'hit') {
+      if (Number(payload.attacker) === Number(myUserId)) {
+        showHitFeedback('#22c55e');
+      } else if (Number(payload.target) === Number(myUserId)) {
+        showHitFeedback('#ef4444');
+      }
       return;
     }
 

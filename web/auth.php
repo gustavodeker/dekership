@@ -118,6 +118,7 @@ function ensure_admin_schema(): void
         "INSERT INTO game_settings (setting_key, setting_value) VALUES
         ('projectile_speed', '1.6'),
         ('movement_speed', '3.0'),
+        ('hits_to_win', '3'),
         ('render_smoothing', '0.25'),
         ('player_hitbox_radius', '5.4'),
         ('projectile_hitbox_radius', '0.6')

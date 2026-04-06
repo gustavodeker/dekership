@@ -15,6 +15,7 @@
   - Overlay central de inicio: `3`, `2`, `1`, `GO!` (GO por 1 segundo)
   - Input bloqueado ate fim do `GO!`
   - Overlay central ao encerrar partida: `Vitoria!` ou `Derrota!` + `Saindo em 3... 2... 1...`
+  - Feedback de hit no centro: `Hit!` por 1s (verde para atacante, vermelho para alvo)
   - Input bloqueado durante o countdown de saida
   - Countdown mostrado apenas 1 vez por `match_id` (nao repetir em recarregar/reconectar)
   - Movimento em 8 direcoes
@@ -29,7 +30,9 @@
 - Configuracoes:
   - Visivel apenas para admin
   - Ajuste de velocidade de projetil e movimento
+  - Ajuste de vida (`hits_to_win`)
   - Ajuste de suavizacao visual (`render_smoothing` 0..1)
+  - Ajuste de hitbox da nave e do projetil
   - Controle de privilegio admin por usuario
 
 ## Fluxo no cliente

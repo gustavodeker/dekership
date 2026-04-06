@@ -112,6 +112,7 @@ class SimulationService:
 
     async def _advance_projectiles(self, room, match: MatchState) -> None:
         game_settings = await self.game_config.get_settings()
+        hits_to_win = max(1, int(game_settings["hits_to_win"]))
         player_hitbox_radius = game_settings["player_hitbox_radius"]
         projectile_hitbox_radius = game_settings["projectile_hitbox_radius"]
         hit_distance = player_hitbox_radius + projectile_hitbox_radius
@@ -129,7 +130,7 @@ class SimulationService:
                 attacker = match.players[projectile.owner_user_id]
                 attacker.hits += 1
                 await self.connection_manager.broadcast_hit(room, match, attacker.user_id, target.user_id)
-                if attacker.hits >= 3:
+                if attacker.hits >= hits_to_win:
                     await self._finish(match, attacker.user_id, target.user_id, "3_hits")
                     return
                 continue

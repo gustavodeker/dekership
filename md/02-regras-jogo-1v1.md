@@ -9,7 +9,7 @@
 - Obstaculos fixos no mapa bloqueiam movimento da nave.
 - Obstaculos bloqueiam projeteis (cobertura).
 - Cada acerto no oponente soma 1 hit.
-- Vence quem atingir 3 hits primeiro.
+- Vence quem atingir a vida configurada (`hits_to_win`) primeiro.
 - Hitbox de acerto entre nave e projetil e circular.
 - Hitbox da nave e do projetil sao configuradas separadamente.
 
@@ -23,7 +23,7 @@
 - Countdown aparece 1 vez por `match_id` (nao repetir em recarga/reconexao da mesma partida).
 
 ## Condicoes de encerramento
-- Vitoria por 3 hits.
+- Vitoria ao atingir `hits_to_win`.
 - Desconexao de um jogador durante `playing`: derrota por abandono apos timeout de reconexao.
 - Timeout de reconexao recomendado: 10 segundos.
 
