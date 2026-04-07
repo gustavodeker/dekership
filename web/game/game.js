@@ -228,6 +228,9 @@ async function fetchSession() {
     return null;
   }
   myUserId = data.user_id;
+  if (typeof data.render_smoothing === 'number') {
+    renderSmoothing = Math.max(0, Math.min(1, data.render_smoothing));
+  }
   if (typeof data.player_hitbox_radius === 'number') {
     playerHitRadius = Math.max(0.1, data.player_hitbox_radius);
   }
