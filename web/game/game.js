@@ -35,9 +35,15 @@ const playerFlashEffects = new Map();
 const playerKnockbackEffects = new Map();
 const shipSprite = new Image();
 let shipSpriteReady = false;
-const SHIP_RENDER_WIDTH = 52;
-const SHIP_RENDER_HEIGHT = 52;
+const SHIP_RENDER_WIDTH = 156;
+const SHIP_RENDER_HEIGHT = 156;
+const SHIP_SPRITE_FRAME_SIZE = 512;
+const SHIP_SPRITE_GRID_COLS = 9;
+const SHIP_SPRITE_GRID_ROWS = 9;
+const SHIP_SPRITE_FRAME_COUNT = SHIP_SPRITE_GRID_COLS * SHIP_SPRITE_GRID_ROWS;
 const SHIP_SPRITE_ANGLE_OFFSET = 0;
+const SHIP_SPRITE_REVERSE_WINDING = true;
+const SHIP_SPRITE_ANGLE_STEP = (Math.PI * 2) / SHIP_SPRITE_FRAME_COUNT;
 
 shipSprite.addEventListener('load', () => {
   shipSpriteReady = true;
@@ -47,7 +53,30 @@ shipSprite.addEventListener('error', () => {
   shipSpriteReady = false;
 });
 
-shipSprite.src = '/web/assets/ship.png';
+shipSprite.src = '/web/assets/spritesheet_9x9_512.png';
+
+function normalizeAngleRad(angle) {
+  const fullTurn = Math.PI * 2;
+  let normalized = angle % fullTurn;
+  if (normalized < 0) normalized += fullTurn;
+  return normalized;
+}
+
+function angleToShipFrameIndex(angle) {
+  const orientedAngle = SHIP_SPRITE_REVERSE_WINDING ? -angle : angle;
+  const normalized = normalizeAngleRad(orientedAngle - SHIP_SPRITE_ANGLE_OFFSET);
+  return Math.round(normalized / SHIP_SPRITE_ANGLE_STEP) % SHIP_SPRITE_FRAME_COUNT;
+}
+
+function frameIndexToSpritePosition(frameIndex) {
+  const clamped = Math.max(0, Math.min(SHIP_SPRITE_FRAME_COUNT - 1, frameIndex));
+  const col = clamped % SHIP_SPRITE_GRID_COLS;
+  const row = Math.floor(clamped / SHIP_SPRITE_GRID_COLS);
+  return {
+    sx: col * SHIP_SPRITE_FRAME_SIZE,
+    sy: row * SHIP_SPRITE_FRAME_SIZE,
+  };
+}
 
 function applyCanvasScale() {
   const panel = canvas.closest('.game-panel');
@@ -332,14 +361,19 @@ function drawPlayer(player, color) {
   const x = arenaToCanvasX(player.x) + knockback.x;
   const y = arenaToCanvasY(player.y) + knockback.y;
   const angle = Math.atan2(player.aim_y - player.y, player.aim_x - player.x);
+  const frameIndex = angleToShipFrameIndex(angle);
+  const { sx, sy } = frameIndexToSpritePosition(frameIndex);
 
   context.save();
   context.translate(x, y);
-  context.rotate(angle + SHIP_SPRITE_ANGLE_OFFSET);
 
   if (shipSpriteReady) {
     context.drawImage(
       shipSprite,
+      sx,
+      sy,
+      SHIP_SPRITE_FRAME_SIZE,
+      SHIP_SPRITE_FRAME_SIZE,
       -SHIP_RENDER_WIDTH / 2,
       -SHIP_RENDER_HEIGHT / 2,
       SHIP_RENDER_WIDTH,
@@ -357,6 +391,7 @@ function drawPlayer(player, color) {
       context.restore();
     }
   } else {
+    context.rotate(angle + SHIP_SPRITE_ANGLE_OFFSET);
     context.fillStyle = flash ? flash.color : color;
     context.beginPath();
     context.moveTo(22, 0);

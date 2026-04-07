@@ -9,7 +9,7 @@
 - Movimento: `WASD` ou setas
 - Mira: cursor do mouse
 - Tiro: clique esquerdo
-- Nave aponta em tempo real para o cursor
+- Nave aponta em tempo real para o cursor por spritesheet direcional (9x9, 81 frames)
 - Nome de cada jogador aparece acima da nave em tempo real
 - Projetil segue a direcao da mira
 

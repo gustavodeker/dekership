@@ -25,7 +25,9 @@
   - Mira pelo mouse
   - Disparo no clique esquerdo
   - Obstaculos renderizados no mapa para cover e rotas
-  - Nave renderizada por sprite PNG (`/web/assets/ship.png`) com rotacao em tempo real
+  - Nave renderizada por spritesheet direcional (`/web/assets/spritesheet_9x9_512.png`, 9x9, 81 frames)
+  - Frame da nave selecionado por angulo da mira (mouse), sem rotacao continua da imagem
+  - Escala de render da nave em 3x (156x156)
   - Nome dos dois jogadores renderizado acima da nave em tempo real
 - Perfil:
   - Vitorias, derrotas, desconexoes
@@ -62,7 +64,7 @@
 - `WASD` ou setas: mover
 - Mouse: mirar
 - Clique esquerdo: atirar
-- Nave renderizada por sprite PNG com rotacao em tempo real
+- Nave renderizada por spritesheet direcional (81 direcoes)
 - Nome do jogador acompanha a nave em tempo real
 
 ## Organizacao de arquivos sugerida
