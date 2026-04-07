@@ -17,13 +17,14 @@
   - Overlay central ao encerrar partida: `Vitoria!` ou `Derrota!` + `Saindo em 3... 2... 1...`
   - Feedback de hit no centro: `Hit!` por 1s (verde para atacante, vermelho para alvo)
   - Hit stop curto no impacto (`55ms`)
-  - Flash de impacto apenas no alvo (`~110ms`; vermelho claro)
+  - Flash de impacto no alvo (`~110ms`): verde quando voce acerta, vermelho quando recebe
   - Knockback visual no alvo (`16px`, decaimento em `140ms`, sem alterar estado autoritativo)
   - Input bloqueado durante o countdown de saida
   - Countdown mostrado apenas 1 vez por `match_id` (nao repetir em recarregar/reconectar)
   - Movimento em 8 direcoes
   - Mira pelo mouse
   - Disparo no clique esquerdo
+  - Projetil com cor por dono: verde (seu), vermelho (inimigo)
   - Obstaculos renderizados no mapa para cover e rotas
   - Nave renderizada por spritesheet direcional (`/web/assets/spritesheet_9x9_512.png`, 9x9, 81 frames)
   - Frame da nave selecionado por angulo da mira (mouse), sem rotacao continua da imagem
@@ -65,6 +66,7 @@
 - Mouse: mirar
 - Clique esquerdo: atirar
 - Nave renderizada por spritesheet direcional (81 direcoes)
+- Projetil verde para voce e vermelho para inimigo
 - Nome do jogador acompanha a nave em tempo real
 
 ## Organizacao de arquivos sugerida

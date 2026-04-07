@@ -12,6 +12,8 @@
 - Nave aponta em tempo real para o cursor por spritesheet direcional (9x9, 81 frames)
 - Nome de cada jogador aparece acima da nave em tempo real
 - Projetil segue a direcao da mira
+- Cor do projetil por dono: verde (seu), vermelho (inimigo)
+- Feedback de hit: verde para acerto proprio, vermelho para acerto recebido
 
 ## UX de partida
 - Inicio: overlay central `3`, `2`, `1`, `GO!`, com controle bloqueado ate o fim.

@@ -431,14 +431,15 @@ function drawPlayer(player, color) {
 function drawProjectile(projectile) {
   const x = arenaToCanvasX(projectile.x);
   const y = arenaToCanvasY(projectile.y);
-  context.fillStyle = '#f59e0b';
+  const isOwnProjectile = Number(projectile.owner_user_id) === Number(myUserId);
+  context.fillStyle = isOwnProjectile ? '#22c55e' : '#ef4444';
   context.beginPath();
   context.arc(x, y, 4, 0, Math.PI * 2);
   context.fill();
 
   if (showHitbox) {
     context.save();
-    context.strokeStyle = 'rgba(245, 158, 11, 0.9)';
+    context.strokeStyle = isOwnProjectile ? 'rgba(34, 197, 94, 0.9)' : 'rgba(239, 68, 68, 0.9)';
     context.lineWidth = 1.5;
     context.beginPath();
     context.arc(x, y, arenaRadiusToCanvasRadius(projectileHitRadius), 0, Math.PI * 2);
@@ -626,13 +627,15 @@ async function connect() {
     if (event === 'hit') {
       const attackerId = Number(payload.attacker);
       const targetId = Number(payload.target);
+      const myHit = attackerId === Number(myUserId);
+      const enemyHit = targetId === Number(myUserId);
       startHitStop();
-      setPlayerFlash(targetId, '#fca5a5');
+      setPlayerFlash(targetId, myHit ? '#86efac' : '#fca5a5');
       applyPlayerKnockback(attackerId, targetId);
 
-      if (Number(payload.attacker) === Number(myUserId)) {
+      if (myHit) {
         showHitFeedback('#22c55e');
-      } else if (Number(payload.target) === Number(myUserId)) {
+      } else if (enemyHit) {
         showHitFeedback('#ef4444');
       }
       return;
