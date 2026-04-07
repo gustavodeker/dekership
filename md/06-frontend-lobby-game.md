@@ -16,9 +16,10 @@
   - Input bloqueado ate fim do `GO!`
   - Overlay central ao encerrar partida: `Vitoria!` ou `Derrota!` + `Saindo em 3... 2... 1...`
   - Feedback de hit no centro: `Hit!` por 1s (verde para atacante, vermelho para alvo)
-  - Hit stop curto no impacto (`55ms`)
+  - Overlay de performance no canto superior esquerdo: `FPS: N | X.X ms`
   - Flash de impacto no alvo (`~110ms`): verde quando voce acerta, vermelho quando recebe
   - Knockback visual no alvo (`16px`, decaimento em `140ms`, sem alterar estado autoritativo)
+  - Movimento seco no cliente (sem inercia visual por interpolacao)
   - Input bloqueado durante o countdown de saida
   - Countdown mostrado apenas 1 vez por `match_id` (nao repetir em recarregar/reconectar)
   - Movimento em 8 direcoes
@@ -40,7 +41,6 @@
   - Ajuste de vida (`hits_to_win`)
   - Ajuste de intervalo minimo entre disparos por clique (`fire_cooldown_ticks`)
   - Seletor de WebSocket ativo (`ws_mode`: `VPS` ou `Local`)
-  - Ajuste de suavizacao visual (`render_smoothing` 0..1)
   - Ajuste de hitbox da nave e do projetil
   - Toggle para mostrar/ocultar linha de hitbox no cliente (`show_hitbox`)
   - Controle de privilegio admin por usuario
@@ -56,7 +56,7 @@
 6. Durante `playing`, enviar `player_input`.
 7. Renderizar estados recebidos por `state`.
    - Incluir render de `obstacles` e colisao visual com cobertura.
-   - Interpolar nave e projetil entre snapshots.
+   - Aplicar posicoes recebidas sem suavizacao para resposta imediata.
    - Parear projetil por `projectile_id` (nao por indice).
 8. Ao `match_end`, mostrar overlay de resultado com countdown de saida e voltar para lobby.
 9. Tratar `room_closed` para limpar estado local de sala (`dk_room_id`/`dk_match_id`) e atualizar lista.

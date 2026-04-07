@@ -19,6 +19,12 @@
 - Jogador B atualiza lista e entra.
 - Ambos recebem `match_start`.
 
+## HUD de performance (game)
+- Exibe no canto superior esquerdo: `FPS: N | X.X ms`.
+- `ms` representa tempo medio de frame no cliente (nao e ping de rede).
+- Render nao usa `hit stop` para evitar travamento visual em hit/mine_hit.
+- Movimento no cliente e direto (sem interpolacao para inercia visual).
+
 ## Logs uteis do WS
 - `[ws auth]`: autenticacao WS.
 - `[room_create]`: sala criada.

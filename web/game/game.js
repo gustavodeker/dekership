@@ -14,7 +14,7 @@ let inputSeq = 0;
 let myUserId = null;
 let state = null;
 let renderState = null;
-let renderSmoothing = 0.25;
+let renderSmoothing = 1;
 const pressed = { left: false, right: false, up: false, down: false };
 const pointer = { x: 50, y: 50 };
 let lastSentAt = 0;
@@ -38,7 +38,11 @@ let showHitbox = true;
 let hitFeedbackUntil = 0;
 let hitFeedbackColor = '#22c55e';
 let hitFeedbackText = 'Hit!';
-let hitStopUntil = 0;
+let fpsLastFrameAt = performance.now();
+let fpsAccumulatorMs = 0;
+let fpsFrameCounter = 0;
+let currentFps = 0;
+let currentFrameMs = 0;
 const playerFlashEffects = new Map();
 const playerKnockbackEffects = new Map();
 const mineFlashEffects = new Map();
@@ -224,9 +228,6 @@ async function fetchSession() {
     return null;
   }
   myUserId = data.user_id;
-  if (typeof data.render_smoothing === 'number') {
-    renderSmoothing = Math.max(0, Math.min(1, data.render_smoothing));
-  }
   if (typeof data.player_hitbox_radius === 'number') {
     playerHitRadius = Math.max(0.1, data.player_hitbox_radius);
   }
@@ -624,10 +625,6 @@ function showHitFeedback(color, text = 'Hit!') {
   hitFeedbackUntil = performance.now() + 1000;
 }
 
-function startHitStop(durationMs = 55) {
-  hitStopUntil = Math.max(hitStopUntil, performance.now() + durationMs);
-}
-
 function findPlayerByUserId(snapshot, userId) {
   if (!snapshot) return null;
   if (Number(snapshot.p1?.user_id) === Number(userId)) return snapshot.p1;
@@ -704,11 +701,37 @@ function drawHitFeedback() {
   context.restore();
 }
 
-function render() {
-  if (performance.now() < hitStopUntil) {
-    requestAnimationFrame(render);
-    return;
+function updateFps(now) {
+  const deltaMs = now - fpsLastFrameAt;
+  fpsLastFrameAt = now;
+  fpsAccumulatorMs += deltaMs;
+  fpsFrameCounter += 1;
+
+  if (fpsAccumulatorMs >= 250) {
+    currentFps = Math.round((fpsFrameCounter * 1000) / fpsAccumulatorMs);
+    currentFrameMs = fpsAccumulatorMs / Math.max(1, fpsFrameCounter);
+    fpsAccumulatorMs = 0;
+    fpsFrameCounter = 0;
   }
+}
+
+function drawFps() {
+  context.save();
+  context.font = '700 16px Arial';
+  context.textAlign = 'left';
+  context.textBaseline = 'top';
+  context.lineWidth = 4;
+  context.strokeStyle = 'rgba(15, 23, 42, 0.9)';
+  context.fillStyle = '#f8fafc';
+  const perfText = `FPS: ${currentFps} | ${currentFrameMs.toFixed(1)} ms`;
+  context.strokeText(perfText, 10, 10);
+  context.fillText(perfText, 10, 10);
+  context.restore();
+}
+
+function render() {
+  const now = performance.now();
+  updateFps(now);
 
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = '#17324f';
@@ -731,6 +754,7 @@ function render() {
     updateMineCooldownUi(state);
   }
   drawHitFeedback();
+  drawFps();
 
   requestAnimationFrame(render);
 }
@@ -792,7 +816,6 @@ async function connect() {
       const myHit = attackerId === Number(myUserId);
       const enemyHit = targetId === Number(myUserId);
       const source = String(payload.source || 'projectile');
-      startHitStop();
       setPlayerFlash(targetId, myHit ? '#86efac' : '#fca5a5');
       applyPlayerKnockback(attackerId, targetId);
 
@@ -811,7 +834,6 @@ async function connect() {
       const destroyed = Boolean(payload.destroyed);
       const myHit = attackerId === Number(myUserId);
       const myMineHit = mineOwnerId === Number(myUserId);
-      startHitStop();
       if (myHit) {
         setMineFlash(mineId, '#86efac');
         showHitFeedback('#22c55e', destroyed ? 'Mina destruída!' : 'Hit!');
