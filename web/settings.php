@@ -15,10 +15,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $movementSpeed = (float) ($_POST['movement_speed'] ?? 3.0);
             $hitsToWin = (int) ($_POST['hits_to_win'] ?? 3);
             $fireCooldownTicks = (int) ($_POST['fire_cooldown_ticks'] ?? 6);
+            $mineCooldownTicks = (int) ($_POST['mine_cooldown_ticks'] ?? 100);
             $wsMode = (string) ($_POST['ws_mode'] ?? 'vps');
             $renderSmoothing = (float) ($_POST['render_smoothing'] ?? 0.25);
             $playerHitboxRadius = (float) ($_POST['player_hitbox_radius'] ?? 5.4);
             $projectileHitboxRadius = (float) ($_POST['projectile_hitbox_radius'] ?? 0.6);
+            $mineHitboxRadius = (float) ($_POST['mine_hitbox_radius'] ?? 2.4);
+            $mineHitsToDestroy = (int) ($_POST['mine_hits_to_destroy'] ?? 2);
             $showHitbox = isset($_POST['show_hitbox']) ? 1 : 0;
 
             if (
@@ -26,11 +29,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 || $movementSpeed <= 0
                 || $hitsToWin <= 0
                 || $fireCooldownTicks <= 0
+                || $mineCooldownTicks <= 0
                 || !in_array($wsMode, ['vps', 'local'], true)
                 || $renderSmoothing < 0
                 || $renderSmoothing > 1
                 || $playerHitboxRadius <= 0
                 || $projectileHitboxRadius <= 0
+                || $mineHitboxRadius <= 0
+                || $mineHitsToDestroy <= 0
             ) {
                 throw new RuntimeException('Valores invalidos');
             }
@@ -44,10 +50,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute(['setting_key' => 'movement_speed', 'setting_value' => (string) $movementSpeed]);
             $stmt->execute(['setting_key' => 'hits_to_win', 'setting_value' => (string) $hitsToWin]);
             $stmt->execute(['setting_key' => 'fire_cooldown_ticks', 'setting_value' => (string) $fireCooldownTicks]);
+            $stmt->execute(['setting_key' => 'mine_cooldown_ticks', 'setting_value' => (string) $mineCooldownTicks]);
             $stmt->execute(['setting_key' => 'ws_mode', 'setting_value' => $wsMode]);
             $stmt->execute(['setting_key' => 'render_smoothing', 'setting_value' => (string) $renderSmoothing]);
             $stmt->execute(['setting_key' => 'player_hitbox_radius', 'setting_value' => (string) $playerHitboxRadius]);
             $stmt->execute(['setting_key' => 'projectile_hitbox_radius', 'setting_value' => (string) $projectileHitboxRadius]);
+            $stmt->execute(['setting_key' => 'mine_hitbox_radius', 'setting_value' => (string) $mineHitboxRadius]);
+            $stmt->execute(['setting_key' => 'mine_hits_to_destroy', 'setting_value' => (string) $mineHitsToDestroy]);
             $stmt->execute(['setting_key' => 'show_hitbox', 'setting_value' => (string) $showHitbox]);
             $success = 'Configuracoes salvas';
         }
@@ -131,6 +140,10 @@ render_header('Configuracoes');
                 <input type="number" step="1" min="1" name="fire_cooldown_ticks" value="<?= htmlspecialchars((string) ($settings['fire_cooldown_ticks'] ?? '6'), ENT_QUOTES, 'UTF-8') ?>" required>
             </label>
             <label>
+                <span>Cooldown da mina (ticks)</span>
+                <input type="number" step="1" min="1" name="mine_cooldown_ticks" value="<?= htmlspecialchars((string) ($settings['mine_cooldown_ticks'] ?? '100'), ENT_QUOTES, 'UTF-8') ?>" required>
+            </label>
+            <label>
                 <span>WebSocket ativo</span>
                 <select name="ws_mode" required>
                     <?php $wsModeSelected = (string) ($settings['ws_mode'] ?? 'vps'); ?>
@@ -149,6 +162,14 @@ render_header('Configuracoes');
             <label>
                 <span>Hitbox do projetil</span>
                 <input type="number" step="0.1" min="0.1" name="projectile_hitbox_radius" value="<?= htmlspecialchars((string) ($settings['projectile_hitbox_radius'] ?? '0.6'), ENT_QUOTES, 'UTF-8') ?>" required>
+            </label>
+            <label>
+                <span>Hitbox da mina</span>
+                <input type="number" step="0.1" min="0.1" name="mine_hitbox_radius" value="<?= htmlspecialchars((string) ($settings['mine_hitbox_radius'] ?? '2.4'), ENT_QUOTES, 'UTF-8') ?>" required>
+            </label>
+            <label>
+                <span>Hits para destruir mina</span>
+                <input type="number" step="1" min="1" name="mine_hits_to_destroy" value="<?= htmlspecialchars((string) ($settings['mine_hits_to_destroy'] ?? '2'), ENT_QUOTES, 'UTF-8') ?>" required>
             </label>
             <label>
                 <span>Mostrar linha de hitbox</span>

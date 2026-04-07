@@ -21,7 +21,9 @@
 - `room_leave`
   - payload: `{}`
 - `player_input`
-  - payload: `{ "seq": 12, "move_x": -1|0|1, "move_y": -1|0|1, "aim_x": 0-100, "aim_y": 0-100, "shoot": true|false }`
+  - payload: `{ "seq": 12, "move_x": -1|0|1, "move_y": -1|0|1, "aim_x": 0-100, "aim_y": 0-100, "shoot": true|false, "drop_mine": true|false }`
+- `drop_mine`
+  - payload: `{}`
 - `ping`
   - payload: `{ "ts": 1712345678 }`
 
@@ -41,9 +43,11 @@
 - `match_start`
   - payload: `{ "match_id": "uuid", "tick_rate": 30 }`
 - `state`
-  - payload: `{ "tick": 145, "paused": false, "pause_remaining_seconds": 0, "pause_disconnected_user_id": null, "p1": { "x": 50, "y": 82, "aim_x": 55, "aim_y": 70, ... }, "p2": { "x": 50, "y": 18, "aim_x": 40, "aim_y": 30, ... }, "projectiles": [{ "projectile_id": 42, "x": 45, "y": 40, "velocity_x": 0.8, "velocity_y": -1.3 }], "obstacles": [{ "x": 44, "y": 35, "width": 12, "height": 30 }], "score": { "p1": 2, "p2": 1 } }`
+  - payload: `{ "tick": 145, "paused": false, "pause_remaining_seconds": 0, "pause_disconnected_user_id": null, "p1": { "x": 50, "y": 82, "aim_x": 55, "aim_y": 70, "last_mine_tick": 100, ... }, "p2": { "x": 50, "y": 18, "aim_x": 40, "aim_y": 30, "last_mine_tick": 95, ... }, "projectiles": [{ "projectile_id": 42, "x": 45, "y": 40, "velocity_x": 0.8, "velocity_y": -1.3 }], "mines": [{ "mine_id": 7, "owner_user_id": 10, "x": 47, "y": 60, "created_tick": 120, "hits_taken": 1 }], "obstacles": [{ "x": 44, "y": 35, "width": 12, "height": 30 }], "score": { "p1": 2, "p2": 1 } }`
 - `hit`
-  - payload: `{ "match_id": "uuid", "attacker": 10, "target": 11, "score": { "attacker": 3, "target": 1 } }`
+  - payload: `{ "match_id": "uuid", "attacker": 10, "target": 11, "score": { "attacker": 3, "target": 1 }, "source": "projectile|mine" }`
+- `mine_hit`
+  - payload: `{ "match_id": "uuid", "attacker": 10, "mine_owner": 11, "mine_id": 7, "destroyed": true|false }`
 - `match_end`
   - payload: `{ "match_id": "uuid", "winner_user_id": 10, "reason": "3_hits|disconnect" }`
 - `pong`
@@ -63,6 +67,7 @@
 - Cliente envia apenas input, nunca estado final.
 - Servidor usa `seq` para descartar input antigo.
 - Em `player_input`, pacote com `shoot=true` e priorizado e nao deve ser perdido por overwrite de input subsequente.
+- `drop_mine` pode ser enviado junto de `player_input` ou em evento dedicado `drop_mine`.
 - `state` enviado em intervalo fixo (ex.: 20-30 Hz).
 - Mira e movimento usam coordenadas normalizadas de arena (`0..100`).
 - Cliente trata `obstacles` como colisores solidos de mapa.

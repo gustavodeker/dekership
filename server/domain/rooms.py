@@ -26,6 +26,7 @@ class PlayerState:
     aim_x: float = 50.0
     aim_y: float = 50.0
     shoot_requested: bool = False
+    mine_requested: bool = False
     disconnect_started_at: datetime | None = None
 
 
@@ -139,6 +140,7 @@ class RoomRegistry:
                     player.move_x = 0
                     player.move_y = 0
                     player.shoot_requested = False
+                    player.mine_requested = False
                     return current_room, player, False, closed_rooms
                 _, room_closed = self._leave_room_unlocked(user_id)
                 if room_closed and current_room is not None:
@@ -179,6 +181,7 @@ class RoomRegistry:
             player.move_x = 0
             player.move_y = 0
             player.shoot_requested = False
+            player.mine_requested = False
             return room
 
     async def mark_disconnected(self, user_id: int) -> RoomState | None:

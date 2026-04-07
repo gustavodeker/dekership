@@ -169,7 +169,7 @@ def build_ws_router(
 
                 if envelope.event == "player_input":
                     payload = PlayerInputPayload.model_validate(envelope.payload)
-                    if not limiter.allow(authed_user.user_id) and not payload.shoot:
+                    if not limiter.allow(authed_user.user_id) and not payload.shoot and not payload.drop_mine:
                         continue
                     room = await rooms.get_room_for_user(authed_user.user_id)
                     if room is None or authed_user.user_id not in room.players:
@@ -185,6 +185,17 @@ def build_ws_router(
                     player.aim_y = payload.aim_y
                     if payload.shoot:
                         player.shoot_requested = True
+                    if payload.drop_mine:
+                        player.mine_requested = True
+                    continue
+
+                if envelope.event == "drop_mine":
+                    room = await rooms.get_room_for_user(authed_user.user_id)
+                    if room is None or authed_user.user_id not in room.players:
+                        await manager.send_error(websocket, "INVALID_STATE", "jogador sem sala")
+                        continue
+                    player = room.players[authed_user.user_id]
+                    player.mine_requested = True
                     continue
 
                 if envelope.event == "ping":

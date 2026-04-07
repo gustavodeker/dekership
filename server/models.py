@@ -18,6 +18,7 @@ class PlayerInputPayload(BaseModel):
     aim_x: float = Field(ge=0, le=100)
     aim_y: float = Field(ge=0, le=100)
     shoot: bool = False
+    drop_mine: bool = False
 
 
 class RoomCreatePayload(BaseModel):

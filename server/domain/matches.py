@@ -24,6 +24,7 @@ class MatchPlayer:
     aim_y: float
     hits: int = 0
     last_shot_tick: int = 0
+    last_mine_tick: int = -1000000
 
 
 @dataclass(slots=True)
@@ -35,6 +36,16 @@ class Projectile:
     velocity_x: float
     velocity_y: float
     speed: float = 1.6
+
+
+@dataclass(slots=True)
+class Mine:
+    mine_id: int
+    owner_user_id: int
+    x: float
+    y: float
+    created_tick: int
+    hits_taken: int = 0
 
 
 @dataclass(slots=True)
@@ -57,6 +68,7 @@ class MatchState:
     end_reason: str | None = None
     players: dict[int, MatchPlayer] = field(default_factory=dict)
     projectiles: list[Projectile] = field(default_factory=list)
+    mines: list[Mine] = field(default_factory=list)
     obstacles: list[Obstacle] = field(default_factory=list)
     task: asyncio.Task | None = None
     started_at: datetime = field(default_factory=utcnow)
@@ -64,6 +76,7 @@ class MatchState:
     paused_by_user_id: int | None = None
     paused_until: datetime | None = None
     next_projectile_id: int = 1
+    next_mine_id: int = 1
 
 
 class MatchRegistry:

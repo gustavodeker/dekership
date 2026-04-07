@@ -37,13 +37,17 @@ $_SESSION['auth_user']['token'] = $freshToken;
 $renderSmoothing = 0.25;
 $playerHitboxRadius = 5.4;
 $projectileHitboxRadius = 0.6;
+$mineHitboxRadius = 2.4;
+$mineCooldownTicks = 100;
+$hitsToWin = 3;
+$mineHitsToDestroy = 2;
 $showHitbox = true;
 $wsMode = 'vps';
 try {
     $settingStmt = db()->prepare(
         "SELECT setting_key, setting_value
          FROM game_settings
-         WHERE setting_key IN ('render_smoothing', 'player_hitbox_radius', 'projectile_hitbox_radius', 'show_hitbox', 'ws_mode')"
+         WHERE setting_key IN ('render_smoothing', 'player_hitbox_radius', 'projectile_hitbox_radius', 'mine_hitbox_radius', 'mine_cooldown_ticks', 'hits_to_win', 'mine_hits_to_destroy', 'show_hitbox', 'ws_mode')"
     );
     $settingStmt->execute();
     $settings = $settingStmt->fetchAll(PDO::FETCH_KEY_PAIR);
@@ -55,6 +59,18 @@ try {
     }
     if (isset($settings['projectile_hitbox_radius'])) {
         $projectileHitboxRadius = (float) $settings['projectile_hitbox_radius'];
+    }
+    if (isset($settings['mine_hitbox_radius'])) {
+        $mineHitboxRadius = (float) $settings['mine_hitbox_radius'];
+    }
+    if (isset($settings['mine_cooldown_ticks'])) {
+        $mineCooldownTicks = (int) (float) $settings['mine_cooldown_ticks'];
+    }
+    if (isset($settings['hits_to_win'])) {
+        $hitsToWin = (int) (float) $settings['hits_to_win'];
+    }
+    if (isset($settings['mine_hits_to_destroy'])) {
+        $mineHitsToDestroy = (int) (float) $settings['mine_hits_to_destroy'];
     }
     if (isset($settings['show_hitbox'])) {
         $showHitbox = (string) $settings['show_hitbox'] !== '0';
@@ -69,12 +85,20 @@ try {
     $renderSmoothing = 0.25;
     $playerHitboxRadius = 5.4;
     $projectileHitboxRadius = 0.6;
+    $mineHitboxRadius = 2.4;
+    $mineCooldownTicks = 100;
+    $hitsToWin = 3;
+    $mineHitsToDestroy = 2;
     $showHitbox = true;
     $wsMode = 'vps';
 }
 $renderSmoothing = max(0.0, min(1.0, $renderSmoothing));
 $playerHitboxRadius = max(0.1, $playerHitboxRadius);
 $projectileHitboxRadius = max(0.1, $projectileHitboxRadius);
+$mineHitboxRadius = max(0.1, $mineHitboxRadius);
+$mineCooldownTicks = max(1, $mineCooldownTicks);
+$hitsToWin = max(1, $hitsToWin);
+$mineHitsToDestroy = max(1, $mineHitsToDestroy);
 $configData = app_config();
 $wsUrl = $wsMode === 'local'
     ? (string) $configData['ws_url_local']
@@ -89,6 +113,10 @@ echo json_encode([
     'render_smoothing' => $renderSmoothing,
     'player_hitbox_radius' => $playerHitboxRadius,
     'projectile_hitbox_radius' => $projectileHitboxRadius,
+    'mine_hitbox_radius' => $mineHitboxRadius,
+    'mine_cooldown_ticks' => $mineCooldownTicks,
+    'hits_to_win' => $hitsToWin,
+    'mine_hits_to_destroy' => $mineHitsToDestroy,
     'show_hitbox' => $showHitbox,
     'ws_mode' => $wsMode,
     'ws_url' => $wsUrl,

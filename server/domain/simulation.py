@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 
 from server.config import settings
 from server.domain.game_config import GameConfigService
-from server.domain.matches import MatchRegistry, MatchState, Projectile
+from server.domain.matches import MatchRegistry, MatchState, Projectile, Mine
 from server.domain.rooms import RoomRegistry, persist_room_closed
 from server.ws.connection_manager import ConnectionManager
 
@@ -64,6 +64,7 @@ class SimulationService:
                         )
                     else:
                         await self._apply_inputs(room, match)
+                        await self._advance_mines(room, match)
                         await self._advance_projectiles(room, match)
                 await self.connection_manager.broadcast_state(room, match)
         except Exception:
@@ -74,6 +75,7 @@ class SimulationService:
         game_settings = await self.game_config.get_settings()
         movement_speed = game_settings["movement_speed"]
         fire_cooldown_ticks = max(1, int(game_settings["fire_cooldown_ticks"]))
+        mine_cooldown_ticks = max(1, int(game_settings["mine_cooldown_ticks"]))
         for player_state in room.players.values():
             match_player = match.players[player_state.user_id]
             input_x = float(player_state.move_x)
@@ -120,27 +122,115 @@ class SimulationService:
                         )
                     )
                     match.next_projectile_id += 1
+            if player_state.mine_requested:
+                player_state.mine_requested = False
+                if (match.tick - match_player.last_mine_tick) >= mine_cooldown_ticks:
+                    match_player.last_mine_tick = match.tick
+                    match.mines.append(
+                        Mine(
+                            mine_id=match.next_mine_id,
+                            owner_user_id=match_player.user_id,
+                            x=match_player.x,
+                            y=match_player.y,
+                            created_tick=match.tick,
+                        )
+                    )
+                    match.next_mine_id += 1
+
+    async def _advance_mines(self, room, match: MatchState) -> None:
+        game_settings = await self.game_config.get_settings()
+        hits_to_win = max(1, int(game_settings["hits_to_win"]))
+        player_hitbox_radius = game_settings["player_hitbox_radius"]
+        mine_hitbox_radius = game_settings["mine_hitbox_radius"]
+        hit_distance = player_hitbox_radius + mine_hitbox_radius
+        visible_to_all_ticks = settings.ws_tick_rate * 2
+
+        active: list[Mine] = []
+        for mine in match.mines:
+            if (match.tick - mine.created_tick) < visible_to_all_ticks:
+                active.append(mine)
+                continue
+
+            target = next(player for player in match.players.values() if player.user_id != mine.owner_user_id)
+            if self._visual_distance(mine.x, mine.y, target.x, target.y) <= hit_distance:
+                attacker = match.players[mine.owner_user_id]
+                attacker.hits += 1
+                await self.connection_manager.broadcast_hit(
+                    room,
+                    match,
+                    attacker.user_id,
+                    target.user_id,
+                    "mine",
+                )
+                if attacker.hits >= hits_to_win:
+                    await self._finish(match, attacker.user_id, target.user_id, "3_hits")
+                    return
+                continue
+            active.append(mine)
+        match.mines = active
 
     async def _advance_projectiles(self, room, match: MatchState) -> None:
         game_settings = await self.game_config.get_settings()
         hits_to_win = max(1, int(game_settings["hits_to_win"]))
+        mine_hits_to_destroy = max(1, int(game_settings["mine_hits_to_destroy"]))
         player_hitbox_radius = game_settings["player_hitbox_radius"]
         projectile_hitbox_radius = game_settings["projectile_hitbox_radius"]
+        mine_hitbox_radius = game_settings["mine_hitbox_radius"]
         hit_distance = player_hitbox_radius + projectile_hitbox_radius
+        mine_hit_distance = mine_hitbox_radius + projectile_hitbox_radius
 
         active: list[Projectile] = []
         for projectile in match.projectiles:
+            previous_x = projectile.x
+            previous_y = projectile.y
             projectile.x += projectile.velocity_x
             projectile.y += projectile.velocity_y
             if projectile.x < 0 or projectile.x > 100 or projectile.y < 0 or projectile.y > 100:
                 continue
             if self._collides_with_obstacle_visual(projectile.x, projectile.y, projectile_hitbox_radius, match):
                 continue
+            enemy_mine_hit = next(
+                (
+                    mine
+                    for mine in match.mines
+                    if mine.owner_user_id != projectile.owner_user_id
+                    and self._segment_hits_circle_visual(
+                        previous_x,
+                        previous_y,
+                        projectile.x,
+                        projectile.y,
+                        mine.x,
+                        mine.y,
+                        mine_hit_distance,
+                    )
+                ),
+                None,
+            )
+            if enemy_mine_hit is not None:
+                enemy_mine_hit.hits_taken += 1
+                mine_destroyed = enemy_mine_hit.hits_taken >= mine_hits_to_destroy
+                if enemy_mine_hit.hits_taken >= mine_hits_to_destroy:
+                    match.mines = [mine for mine in match.mines if mine.mine_id != enemy_mine_hit.mine_id]
+                await self.connection_manager.broadcast_mine_hit(
+                    room,
+                    match,
+                    projectile.owner_user_id,
+                    enemy_mine_hit.owner_user_id,
+                    enemy_mine_hit.mine_id,
+                    mine_destroyed,
+                )
+                continue
             target = next(player for player in match.players.values() if player.user_id != projectile.owner_user_id)
             if self._visual_distance(projectile.x, projectile.y, target.x, target.y) <= hit_distance:
                 attacker = match.players[projectile.owner_user_id]
                 attacker.hits += 1
-                await self.connection_manager.broadcast_hit(room, match, attacker.user_id, target.user_id)
+                await self.connection_manager.broadcast_hit(
+                    room,
+                    match,
+                    attacker.user_id,
+                    target.user_id,
+                    "projectile",
+                )
                 if attacker.hits >= hits_to_win:
                     await self._finish(match, attacker.user_id, target.user_id, "3_hits")
                     return
@@ -169,6 +259,30 @@ class SimulationService:
             if self._visual_distance(x, y, closest_x, closest_y) <= radius:
                 return True
         return False
+
+    def _segment_hits_circle_visual(
+        self,
+        x1: float,
+        y1: float,
+        x2: float,
+        y2: float,
+        cx: float,
+        cy: float,
+        radius: float,
+    ) -> bool:
+        x1v = x1 / self.visual_x_axis_factor
+        x2v = x2 / self.visual_x_axis_factor
+        cxv = cx / self.visual_x_axis_factor
+        dx = x2v - x1v
+        dy = y2 - y1
+        segment_length_sq = (dx * dx) + (dy * dy)
+        if segment_length_sq <= 0:
+            return math.hypot(cxv - x1v, cy - y1) <= radius
+        t = ((cxv - x1v) * dx + (cy - y1) * dy) / segment_length_sq
+        t = max(0.0, min(1.0, t))
+        nearest_x = x1v + (dx * t)
+        nearest_y = y1 + (dy * t)
+        return math.hypot(cxv - nearest_x, cy - nearest_y) <= radius
 
     @staticmethod
     def _first_disconnected_user(room) -> int | None:

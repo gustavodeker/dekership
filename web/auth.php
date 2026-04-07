@@ -120,10 +120,13 @@ function ensure_admin_schema(): void
         ('movement_speed', '3.0'),
         ('hits_to_win', '3'),
         ('fire_cooldown_ticks', '6'),
+        ('mine_cooldown_ticks', '100'),
         ('ws_mode', 'vps'),
         ('render_smoothing', '0.25'),
         ('player_hitbox_radius', '5.4'),
         ('projectile_hitbox_radius', '0.6'),
+        ('mine_hitbox_radius', '2.4'),
+        ('mine_hits_to_destroy', '2'),
         ('show_hitbox', '1')
         ON DUPLICATE KEY UPDATE setting_value = setting_value"
     );

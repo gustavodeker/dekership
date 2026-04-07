@@ -57,60 +57,83 @@ class ConnectionManager:
                 0,
                 math.ceil((match.paused_until - datetime.now(timezone.utc)).total_seconds()),
             )
-        await self.broadcast(
-            room,
-            "state",
-            {
-                "tick": match.tick,
-                "paused": match.paused_until is not None,
-                "pause_remaining_seconds": pause_remaining_seconds,
-                "pause_disconnected_user_id": match.paused_by_user_id,
-                "p1": {
-                    "user_id": players["bottom"].user_id,
-                    "username": players["bottom"].username,
-                    "x": players["bottom"].x,
-                    "y": players["bottom"].y,
-                    "aim_x": players["bottom"].aim_x,
-                    "aim_y": players["bottom"].aim_y,
-                    "side": "bottom",
-                },
-                "p2": {
-                    "user_id": players["top"].user_id,
-                    "username": players["top"].username,
-                    "x": players["top"].x,
-                    "y": players["top"].y,
-                    "aim_x": players["top"].aim_x,
-                    "aim_y": players["top"].aim_y,
-                    "side": "top",
-                },
-                "projectiles": [
-                    {
-                        "projectile_id": projectile.projectile_id,
-                        "owner_user_id": projectile.owner_user_id,
-                        "x": projectile.x,
-                        "y": projectile.y,
-                        "velocity_x": projectile.velocity_x,
-                        "velocity_y": projectile.velocity_y,
-                    }
-                    for projectile in match.projectiles
-                ],
-                "obstacles": [
-                    {
-                        "x": obstacle.x,
-                        "y": obstacle.y,
-                        "width": obstacle.width,
-                        "height": obstacle.height,
-                    }
-                    for obstacle in match.obstacles
-                ],
-                "score": {
-                    "p1": players["bottom"].hits,
-                    "p2": players["top"].hits,
-                },
+        shared_payload = {
+            "tick": match.tick,
+            "paused": match.paused_until is not None,
+            "pause_remaining_seconds": pause_remaining_seconds,
+            "pause_disconnected_user_id": match.paused_by_user_id,
+            "p1": {
+                "user_id": players["bottom"].user_id,
+                "username": players["bottom"].username,
+                "x": players["bottom"].x,
+                "y": players["bottom"].y,
+                "aim_x": players["bottom"].aim_x,
+                "aim_y": players["bottom"].aim_y,
+                "side": "bottom",
+                "last_mine_tick": players["bottom"].last_mine_tick,
             },
-        )
+            "p2": {
+                "user_id": players["top"].user_id,
+                "username": players["top"].username,
+                "x": players["top"].x,
+                "y": players["top"].y,
+                "aim_x": players["top"].aim_x,
+                "aim_y": players["top"].aim_y,
+                "side": "top",
+                "last_mine_tick": players["top"].last_mine_tick,
+            },
+            "projectiles": [
+                {
+                    "projectile_id": projectile.projectile_id,
+                    "owner_user_id": projectile.owner_user_id,
+                    "x": projectile.x,
+                    "y": projectile.y,
+                    "velocity_x": projectile.velocity_x,
+                    "velocity_y": projectile.velocity_y,
+                }
+                for projectile in match.projectiles
+            ],
+            "obstacles": [
+                {
+                    "x": obstacle.x,
+                    "y": obstacle.y,
+                    "width": obstacle.width,
+                    "height": obstacle.height,
+                }
+                for obstacle in match.obstacles
+            ],
+            "score": {
+                "p1": players["bottom"].hits,
+                "p2": players["top"].hits,
+            },
+        }
+        for room_player in room.players.values():
+            if not room_player.connected or room_player.websocket is None:
+                continue
+            payload = {
+                **shared_payload,
+                "mines": [
+                    {
+                        "mine_id": mine.mine_id,
+                        "owner_user_id": mine.owner_user_id,
+                        "x": mine.x,
+                        "y": mine.y,
+                        "created_tick": mine.created_tick,
+                        "hits_taken": mine.hits_taken,
+                    }
+                    for mine in match.mines
+                ],
+            }
+            await self.send_json(room_player.websocket, "state", payload)
 
-    async def broadcast_hit(self, room: RoomState, match: MatchState, attacker_id: int, target_id: int) -> None:
+    async def broadcast_hit(
+        self,
+        room: RoomState,
+        match: MatchState,
+        attacker_id: int,
+        target_id: int,
+        source: str = "projectile",
+    ) -> None:
         attacker = match.players[attacker_id]
         target = match.players[target_id]
         await self.broadcast(
@@ -124,6 +147,28 @@ class ConnectionManager:
                     "attacker": attacker.hits,
                     "target": target.hits,
                 },
+                "source": source,
+            },
+        )
+
+    async def broadcast_mine_hit(
+        self,
+        room: RoomState,
+        match: MatchState,
+        attacker_id: int,
+        mine_owner_id: int,
+        mine_id: int,
+        destroyed: bool,
+    ) -> None:
+        await self.broadcast(
+            room,
+            "mine_hit",
+            {
+                "match_id": match.match_id,
+                "attacker": attacker_id,
+                "mine_owner": mine_owner_id,
+                "mine_id": mine_id,
+                "destroyed": destroyed,
             },
         )
 

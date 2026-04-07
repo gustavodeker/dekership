@@ -4,6 +4,7 @@ const statusNode = document.getElementById('game-status');
 const scoreSelf = document.getElementById('score-self');
 const scoreOpponent = document.getElementById('score-opponent');
 const startOverlayNode = document.getElementById('game-start-overlay');
+const mineCooldownValueNode = document.getElementById('mine-cooldown-value');
 const DESIGN_WIDTH = canvas.width;
 const DESIGN_HEIGHT = canvas.height;
 
@@ -18,6 +19,7 @@ const pressed = { left: false, right: false, up: false, down: false };
 const pointer = { x: 50, y: 50 };
 let lastSentAt = 0;
 let pendingShot = false;
+let pendingMine = false;
 let flushTimer = null;
 let resizeHandle = null;
 let matchStarted = false;
@@ -27,12 +29,19 @@ let endCountdownInterval = null;
 let controlsLocked = false;
 let playerHitRadius = 5.4;
 let projectileHitRadius = 0.6;
+let mineHitRadius = 2.4;
+let mineCooldownTicks = 100;
+let matchTickRate = 20;
+let hitsToWin = 3;
+let mineHitsToDestroy = 2;
 let showHitbox = true;
 let hitFeedbackUntil = 0;
 let hitFeedbackColor = '#22c55e';
+let hitFeedbackText = 'Hit!';
 let hitStopUntil = 0;
 const playerFlashEffects = new Map();
 const playerKnockbackEffects = new Map();
+const mineFlashEffects = new Map();
 const shipSprite = new Image();
 let shipSpriteReady = false;
 const SHIP_RENDER_WIDTH = 156;
@@ -54,6 +63,9 @@ shipSprite.addEventListener('error', () => {
 });
 
 shipSprite.src = '/web/assets/spritesheet_9x9_512.png';
+if (mineCooldownValueNode) {
+  mineCooldownValueNode.textContent = 'READY';
+}
 
 function normalizeAngleRad(angle) {
   const fullTurn = Math.PI * 2;
@@ -134,6 +146,7 @@ function startMatchCountdown() {
   clearStartOverlayTimers();
   controlsLocked = true;
   pendingShot = false;
+  pendingMine = false;
   startOverlayNode.classList.remove('game-start-overlay--end');
 
   let count = 3;
@@ -171,6 +184,7 @@ function startMatchEndCountdown(won) {
   clearStartOverlayTimers();
   controlsLocked = true;
   pendingShot = false;
+  pendingMine = false;
   startOverlayNode.hidden = false;
 
   let count = 3;
@@ -219,6 +233,18 @@ async function fetchSession() {
   if (typeof data.projectile_hitbox_radius === 'number') {
     projectileHitRadius = Math.max(0.1, data.projectile_hitbox_radius);
   }
+  if (typeof data.mine_hitbox_radius === 'number') {
+    mineHitRadius = Math.max(0.1, data.mine_hitbox_radius);
+  }
+  if (typeof data.mine_cooldown_ticks === 'number') {
+    mineCooldownTicks = Math.max(1, Math.floor(data.mine_cooldown_ticks));
+  }
+  if (typeof data.hits_to_win === 'number') {
+    hitsToWin = Math.max(1, Math.floor(data.hits_to_win));
+  }
+  if (typeof data.mine_hits_to_destroy === 'number') {
+    mineHitsToDestroy = Math.max(1, Math.floor(data.mine_hits_to_destroy));
+  }
   if (typeof data.show_hitbox === 'boolean') {
     showHitbox = data.show_hitbox;
   }
@@ -227,6 +253,12 @@ async function fetchSession() {
 
 function send(event, payload = {}) {
   ws.send(JSON.stringify({ event, payload, request_id: String(++requestId) }));
+}
+
+function requestMineDrop() {
+  if (controlsLocked) return;
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  send('drop_mine', {});
 }
 
 function currentMoveX() {
@@ -241,7 +273,7 @@ function currentMoveY() {
   return 0;
 }
 
-function sendInput(shoot = false) {
+function sendInput(shoot = false, dropMine = false) {
   if (controlsLocked) return;
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   send('player_input', {
@@ -251,6 +283,7 @@ function sendInput(shoot = false) {
     aim_x: pointer.x,
     aim_y: pointer.y,
     shoot,
+    drop_mine: dropMine,
   });
 }
 
@@ -278,6 +311,7 @@ function cloneGameState(snapshot) {
     score: { ...snapshot.score },
     obstacles: (snapshot.obstacles || []).map((obstacle) => ({ ...obstacle })),
     projectiles: (snapshot.projectiles || []).map((projectile) => ({ ...projectile })),
+    mines: (snapshot.mines || []).map((mine) => ({ ...mine })),
   };
 }
 
@@ -323,6 +357,7 @@ function blendState(current, target, alpha) {
     score: { ...target.score },
     obstacles: (target.obstacles || []).map((obstacle) => ({ ...obstacle })),
     projectiles: blendProjectiles(current.projectiles || [], target.projectiles || [], alpha),
+    mines: (target.mines || []).map((mine) => ({ ...mine })),
   };
 }
 
@@ -338,14 +373,15 @@ function scheduleInput() {
   if (controlsLocked) return;
   const now = performance.now();
   const elapsed = now - lastSentAt;
-  if (pendingShot || elapsed >= 33) {
+  if (pendingShot || pendingMine || elapsed >= 33) {
     if (flushTimer) {
       clearTimeout(flushTimer);
       flushTimer = null;
     }
     lastSentAt = now;
-    sendInput(pendingShot);
+    sendInput(pendingShot, pendingMine);
     pendingShot = false;
+    pendingMine = false;
     return;
   }
   if (flushTimer) return;
@@ -355,7 +391,42 @@ function scheduleInput() {
   }, 33 - elapsed);
 }
 
-function drawPlayer(player, color) {
+function mineCooldownRemainingSeconds(snapshot) {
+  if (!snapshot || !myUserId) return 0;
+  const selfPlayer = Number(snapshot.p1?.user_id) === Number(myUserId) ? snapshot.p1 : snapshot.p2;
+  if (!selfPlayer) return 0;
+  const lastMineTick = Number(selfPlayer.last_mine_tick ?? -1000000);
+  const elapsedTicks = Number(snapshot.tick ?? 0) - lastMineTick;
+  const remainingTicks = Math.max(0, mineCooldownTicks - elapsedTicks);
+  return remainingTicks / Math.max(1, matchTickRate);
+}
+
+function updateMineCooldownUi(snapshot) {
+  if (!mineCooldownValueNode) return;
+  const remaining = mineCooldownRemainingSeconds(snapshot);
+  mineCooldownValueNode.textContent = remaining <= 0 ? 'READY' : `${remaining.toFixed(1)}s`;
+}
+
+function isMineHotkey(event) {
+  if (!event) return false;
+  return event.code === 'Digit1' || event.code === 'Numpad1' || event.key === '1' || event.key === 'End';
+}
+
+function drawRectHealthBar(centerX, topY, width, height, ratio, fillColor) {
+  const clamped = Math.max(0, Math.min(1, ratio));
+  const left = centerX - (width / 2);
+  context.save();
+  context.fillStyle = 'rgba(15, 23, 42, 0.9)';
+  context.fillRect(left, topY, width, height);
+  context.fillStyle = fillColor;
+  context.fillRect(left, topY, width * clamped, height);
+  context.strokeStyle = 'rgba(248, 250, 252, 0.8)';
+  context.lineWidth = 1;
+  context.strokeRect(left, topY, width, height);
+  context.restore();
+}
+
+function drawPlayer(player, color, lifeRatio = 1) {
   const flash = getPlayerFlash(player.user_id);
   const knockback = getPlayerKnockbackOffset(player.user_id);
   const x = arenaToCanvasX(player.x) + knockback.x;
@@ -422,10 +493,12 @@ function drawPlayer(player, color) {
     context.lineWidth = 4;
     context.strokeStyle = 'rgba(15, 23, 42, 0.9)';
     context.fillStyle = '#f8fafc';
-    context.strokeText(player.username, x, y - 18);
-    context.fillText(player.username, x, y - 18);
+    context.strokeText(player.username, x, y - 33);
+    context.fillText(player.username, x, y - 33);
     context.restore();
   }
+
+  drawRectHealthBar(x, y - 57, 56, 7, lifeRatio, '#22c55e');
 }
 
 function drawProjectile(projectile) {
@@ -448,6 +521,85 @@ function drawProjectile(projectile) {
   }
 }
 
+function drawMine(mine) {
+  const x = arenaToCanvasX(mine.x);
+  const y = arenaToCanvasY(mine.y);
+  const isOwnMine = Number(mine.owner_user_id) === Number(myUserId);
+  const mineFlash = getMineFlash(mine.mine_id);
+  const coreRadius = 7;
+  const spikeCount = 8;
+  const spikeLength = 5;
+  const baseColor = isOwnMine ? '#22c55e' : '#ef4444';
+
+  if (mineFlash) {
+    context.save();
+    context.globalAlpha = 0.55;
+    context.fillStyle = mineFlash.color;
+    context.beginPath();
+    context.arc(x, y, coreRadius + spikeLength + 1, 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+  }
+
+  context.save();
+  context.strokeStyle = baseColor;
+  context.lineWidth = 2;
+  for (let i = 0; i < spikeCount; i += 1) {
+    const angle = (Math.PI * 2 * i) / spikeCount;
+    const innerX = x + Math.cos(angle) * (coreRadius + 1);
+    const innerY = y + Math.sin(angle) * (coreRadius + 1);
+    const outerX = x + Math.cos(angle) * (coreRadius + spikeLength);
+    const outerY = y + Math.sin(angle) * (coreRadius + spikeLength);
+    context.beginPath();
+    context.moveTo(innerX, innerY);
+    context.lineTo(outerX, outerY);
+    context.stroke();
+  }
+  context.restore();
+
+  context.fillStyle = baseColor;
+  context.beginPath();
+  context.arc(x, y, coreRadius, 0, Math.PI * 2);
+  context.fill();
+  context.strokeStyle = '#0f172a';
+  context.lineWidth = 2;
+  context.beginPath();
+  context.arc(x, y, coreRadius, 0, Math.PI * 2);
+  context.stroke();
+
+  if (showHitbox) {
+    context.save();
+    context.strokeStyle = isOwnMine ? 'rgba(34, 197, 94, 0.85)' : 'rgba(239, 68, 68, 0.85)';
+    context.lineWidth = 1.5;
+    context.beginPath();
+    context.arc(x, y, arenaRadiusToCanvasRadius(mineHitRadius), 0, Math.PI * 2);
+    context.stroke();
+    context.restore();
+  }
+
+  const mineLifeRatio = (mineHitsToDestroy - Number(mine.hits_taken || 0)) / mineHitsToDestroy;
+  drawRectHealthBar(x, y + 17, 30, 6, mineLifeRatio, '#22c55e');
+}
+
+function setMineFlash(mineId, color, durationMs = 110) {
+  if (!Number.isFinite(Number(mineId))) return;
+  mineFlashEffects.set(Number(mineId), {
+    color,
+    until: performance.now() + durationMs,
+  });
+}
+
+function getMineFlash(mineId) {
+  const key = Number(mineId);
+  const effect = mineFlashEffects.get(key);
+  if (!effect) return null;
+  if (performance.now() > effect.until) {
+    mineFlashEffects.delete(key);
+    return null;
+  }
+  return effect;
+}
+
 function drawObstacle(obstacle) {
   context.fillStyle = '#334155';
   context.fillRect(
@@ -466,8 +618,9 @@ function drawObstacle(obstacle) {
   );
 }
 
-function showHitFeedback(color) {
+function showHitFeedback(color, text = 'Hit!') {
   hitFeedbackColor = color;
+  hitFeedbackText = text;
   hitFeedbackUntil = performance.now() + 1000;
 }
 
@@ -546,8 +699,8 @@ function drawHitFeedback() {
   context.lineWidth = 6;
   context.strokeStyle = 'rgba(15, 23, 42, 0.85)';
   context.fillStyle = hitFeedbackColor;
-  context.strokeText('Hit!', canvas.width / 2, canvas.height / 2);
-  context.fillText('Hit!', canvas.width / 2, canvas.height / 2);
+  context.strokeText(hitFeedbackText, canvas.width / 2, canvas.height / 2);
+  context.fillText(hitFeedbackText, canvas.width / 2, canvas.height / 2);
   context.restore();
 }
 
@@ -564,12 +717,18 @@ function render() {
   if (state) {
     renderState = blendState(renderState, state, renderSmoothing);
     (renderState.obstacles || []).forEach(drawObstacle);
-    drawPlayer(renderState.p1, renderState.p1.user_id === myUserId ? '#22c55e' : '#3b82f6');
-    drawPlayer(renderState.p2, renderState.p2.user_id === myUserId ? '#22c55e' : '#ef4444');
+    (renderState.mines || []).forEach(drawMine);
+    const p1DamageTaken = Number(state.score?.p2 || 0);
+    const p2DamageTaken = Number(state.score?.p1 || 0);
+    const p1LifeRatio = (hitsToWin - p1DamageTaken) / hitsToWin;
+    const p2LifeRatio = (hitsToWin - p2DamageTaken) / hitsToWin;
+    drawPlayer(renderState.p1, renderState.p1.user_id === myUserId ? '#22c55e' : '#3b82f6', p1LifeRatio);
+    drawPlayer(renderState.p2, renderState.p2.user_id === myUserId ? '#22c55e' : '#ef4444', p2LifeRatio);
     renderState.projectiles.forEach(drawProjectile);
     const selfIsBottom = state.p1.user_id === myUserId;
     scoreSelf.textContent = selfIsBottom ? state.score.p1 : state.score.p2;
     scoreOpponent.textContent = selfIsBottom ? state.score.p2 : state.score.p1;
+    updateMineCooldownUi(state);
   }
   drawHitFeedback();
 
@@ -603,6 +762,9 @@ async function connect() {
 
     if (event === 'match_start') {
       const matchId = payload.match_id;
+      if (typeof payload.tick_rate === 'number') {
+        matchTickRate = Math.max(1, Math.floor(payload.tick_rate));
+      }
       localStorage.setItem('dk_match_id', matchId);
       matchStarted = true;
       statusNode.textContent = 'Partida iniciando...';
@@ -629,14 +791,33 @@ async function connect() {
       const targetId = Number(payload.target);
       const myHit = attackerId === Number(myUserId);
       const enemyHit = targetId === Number(myUserId);
+      const source = String(payload.source || 'projectile');
       startHitStop();
       setPlayerFlash(targetId, myHit ? '#86efac' : '#fca5a5');
       applyPlayerKnockback(attackerId, targetId);
 
       if (myHit) {
-        showHitFeedback('#22c55e');
+        showHitFeedback('#22c55e', 'Hit!');
       } else if (enemyHit) {
-        showHitFeedback('#ef4444');
+        showHitFeedback('#ef4444', source === 'mine' ? 'Mina!' : 'Hit!');
+      }
+      return;
+    }
+
+    if (event === 'mine_hit') {
+      const attackerId = Number(payload.attacker);
+      const mineOwnerId = Number(payload.mine_owner);
+      const mineId = Number(payload.mine_id);
+      const destroyed = Boolean(payload.destroyed);
+      const myHit = attackerId === Number(myUserId);
+      const myMineHit = mineOwnerId === Number(myUserId);
+      startHitStop();
+      if (myHit) {
+        setMineFlash(mineId, '#86efac');
+        showHitFeedback('#22c55e', destroyed ? 'Mina destruída!' : 'Hit!');
+      } else if (myMineHit) {
+        setMineFlash(mineId, '#fca5a5');
+        showHitFeedback('#ef4444', destroyed ? 'Mina destruída!' : 'Hit!');
       }
       return;
     }
@@ -661,6 +842,11 @@ window.addEventListener('keydown', (event) => {
   if (event.key === 'ArrowRight' || event.key.toLowerCase() === 'd') pressed.right = true;
   if (event.key === 'ArrowUp' || event.key.toLowerCase() === 'w') pressed.up = true;
   if (event.key === 'ArrowDown' || event.key.toLowerCase() === 's') pressed.down = true;
+  if (isMineHotkey(event) && !event.repeat) {
+    event.preventDefault();
+    pendingMine = false;
+    requestMineDrop();
+  }
   scheduleInput();
 });
 

@@ -10,10 +10,13 @@
 - `movement_speed`: deslocamento horizontal por tick.
 - `hits_to_win`: acertos necessarios para vencer (vida da partida).
 - `fire_cooldown_ticks`: intervalo minimo entre disparos por clique (ticks da simulacao).
+- `mine_cooldown_ticks`: intervalo minimo entre minas (ticks da simulacao).
 - `ws_mode`: seleciona endpoint WebSocket ativo (`vps` ou `local`).
 - `render_smoothing`: fator de suavizacao visual no cliente (`0..1`).
 - `player_hitbox_radius`: raio da hitbox da nave.
 - `projectile_hitbox_radius`: raio da hitbox do projetil.
+- `mine_hitbox_radius`: raio da hitbox da mina.
+- `mine_hits_to_destroy`: hits de projetil necessarios para destruir mina.
 - `show_hitbox`: habilita/oculta linha de hitbox visivel no cliente (`1`/`0`).
 - Persistencia em `game_settings`.
 
