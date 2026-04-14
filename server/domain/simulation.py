@@ -168,6 +168,7 @@ class SimulationService:
                     attacker.user_id,
                     target.user_id,
                     "mine",
+                    not life_damage_applied,
                 )
                 if life_damage_applied and attacker.hits >= hits_to_win:
                     await self._finish(match, attacker.user_id, target.user_id, "3_hits")
@@ -240,6 +241,7 @@ class SimulationService:
                     attacker.user_id,
                     target.user_id,
                     "projectile",
+                    not life_damage_applied,
                 )
                 if life_damage_applied and attacker.hits >= hits_to_win:
                     await self._finish(match, attacker.user_id, target.user_id, "3_hits")

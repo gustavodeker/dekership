@@ -49,6 +49,7 @@ let currentFrameMs = 0;
 const playerFlashEffects = new Map();
 const playerKnockbackEffects = new Map();
 const mineFlashEffects = new Map();
+const shieldRegenPulseEffects = new Map();
 const shipSprite = new Image();
 let shipSpriteReady = false;
 const shieldSprite = new Image();
@@ -65,6 +66,7 @@ const SHIP_SPRITE_ANGLE_STEP = (Math.PI * 2) / SHIP_SPRITE_FRAME_COUNT;
 const SHIELD_RENDER_WIDTH = 188;
 const SHIELD_RENDER_HEIGHT = 188;
 const SHIELD_ANIMATION_FPS = 20;
+const SHIELD_REGEN_PULSE_DURATION_MS = 520;
 const shieldAtlas = {
   frameWidth: 512,
   frameHeight: 512,
@@ -546,6 +548,7 @@ function drawRectHealthBar(centerX, topY, width, height, ratio, fillColor) {
 function drawPlayer(player, color, lifeRatio = 1, shieldRatio = 1) {
   const flash = getPlayerFlash(player.user_id);
   const knockback = getPlayerKnockbackOffset(player.user_id);
+  const shieldRegenPulse = getShieldRegenPulse(player.user_id);
   const x = arenaToCanvasX(player.x) + knockback.x;
   const y = arenaToCanvasY(player.y) + knockback.y;
   const angle = Math.atan2(player.aim_y - player.y, player.aim_x - player.x);
@@ -571,11 +574,15 @@ function drawPlayer(player, color, lifeRatio = 1, shieldRatio = 1) {
     if (flash) {
       context.save();
       context.globalCompositeOperation = 'source-atop';
-      context.globalAlpha = 0.5;
-      context.fillStyle = flash.color;
-      context.beginPath();
-      context.arc(0, 0, Math.min(SHIP_RENDER_WIDTH, SHIP_RENDER_HEIGHT) * 0.3, 0, Math.PI * 2);
-      context.fill();
+      if (flash.kind === 'shield') {
+        drawShieldHoneycombFlash(flash);
+      } else {
+        context.globalAlpha = 0.5;
+        context.fillStyle = flash.color;
+        context.beginPath();
+        context.arc(0, 0, Math.min(SHIP_RENDER_WIDTH, SHIP_RENDER_HEIGHT) * 0.3, 0, Math.PI * 2);
+        context.fill();
+      }
       context.restore();
     }
   } else {
@@ -607,6 +614,19 @@ function drawPlayer(player, color, lifeRatio = 1, shieldRatio = 1) {
     }
   }
 
+  if (shieldRegenPulse) {
+    const shieldBaseRadius = (Math.min(SHIELD_RENDER_WIDTH, SHIELD_RENDER_HEIGHT) / 2) * 0.48;
+    const pulseRadius = shieldBaseRadius * (0.97 + (0.1 * shieldRegenPulse.progress));
+    context.save();
+    context.globalAlpha = 0.75 * (1 - shieldRegenPulse.progress);
+    context.strokeStyle = '#bfe4ff';
+    context.lineWidth = 3.2 - (1.2 * shieldRegenPulse.progress);
+    context.beginPath();
+    context.arc(0, 0, pulseRadius, 0, Math.PI * 2);
+    context.stroke();
+    context.restore();
+  }
+
   context.restore();
 
   if (showHitbox) {
@@ -634,6 +654,46 @@ function drawPlayer(player, color, lifeRatio = 1, shieldRatio = 1) {
 
   drawRectHealthBar(x, y - 67, 56, 7, shieldRatio, '#60a5fa');
   drawRectHealthBar(x, y - 57, 56, 7, lifeRatio, '#22c55e');
+}
+
+function drawShieldHoneycombFlash(flash) {
+  const pulse = 1 - (flash.progress || 0);
+  const radius = Math.min(SHIP_RENDER_WIDTH, SHIP_RENDER_HEIGHT) * 0.34;
+  const hexSize = 5.5;
+  const rowStep = hexSize * 1.5;
+  const colStep = Math.sqrt(3) * hexSize;
+  const maxRow = Math.ceil(radius / rowStep) + 1;
+  const maxCol = Math.ceil(radius / colStep) + 1;
+
+  context.globalAlpha = 0.85 * pulse;
+  context.strokeStyle = '#bfe4ff';
+  context.lineWidth = 1.5;
+
+  for (let row = -maxRow; row <= maxRow; row += 1) {
+    const y = row * rowStep;
+    const xOffset = (Math.abs(row) % 2) * (colStep / 2);
+    for (let col = -maxCol; col <= maxCol; col += 1) {
+      const x = (col * colStep) + xOffset;
+      if ((x * x) + (y * y) > radius * radius) continue;
+      drawHexPath(x, y, hexSize);
+      context.stroke();
+    }
+  }
+}
+
+function drawHexPath(cx, cy, size) {
+  context.beginPath();
+  for (let side = 0; side < 6; side += 1) {
+    const angle = (Math.PI / 3) * side + (Math.PI / 6);
+    const x = cx + (Math.cos(angle) * size);
+    const y = cy + (Math.sin(angle) * size);
+    if (side === 0) {
+      context.moveTo(x, y);
+    } else {
+      context.lineTo(x, y);
+    }
+  }
+  context.closePath();
 }
 
 function drawProjectile(projectile) {
@@ -735,6 +795,45 @@ function getMineFlash(mineId) {
   return effect;
 }
 
+function setShieldRegenPulse(userId, durationMs = SHIELD_REGEN_PULSE_DURATION_MS) {
+  const startAt = performance.now();
+  shieldRegenPulseEffects.set(Number(userId), {
+    startAt,
+    endAt: startAt + Math.max(1, durationMs),
+  });
+}
+
+function getShieldRegenPulse(userId) {
+  const key = Number(userId);
+  const effect = shieldRegenPulseEffects.get(key);
+  if (!effect) return null;
+  const now = performance.now();
+  const totalDuration = Math.max(1, effect.endAt - effect.startAt);
+  const elapsed = now - effect.startAt;
+  if (elapsed >= totalDuration) {
+    shieldRegenPulseEffects.delete(key);
+    return null;
+  }
+  return {
+    progress: Math.max(0, Math.min(1, elapsed / totalDuration)),
+  };
+}
+
+function triggerShieldRegenEffects(previousSnapshot, currentSnapshot) {
+  if (!previousSnapshot || !currentSnapshot) return;
+  for (const key of ['p1', 'p2']) {
+    const previousPlayer = previousSnapshot[key];
+    const currentPlayer = currentSnapshot[key];
+    if (!previousPlayer || !currentPlayer) continue;
+    if (Number(previousPlayer.user_id) !== Number(currentPlayer.user_id)) continue;
+    const previousShield = Math.max(0, Math.floor(Number(previousPlayer.shield_points ?? 0)));
+    const currentShield = Math.max(0, Math.floor(Number(currentPlayer.shield_points ?? 0)));
+    if (currentShield > previousShield) {
+      setShieldRegenPulse(currentPlayer.user_id);
+    }
+  }
+}
+
 function drawObstacle(obstacle) {
   context.fillStyle = '#334155';
   context.fillRect(
@@ -766,11 +865,15 @@ function findPlayerByUserId(snapshot, userId) {
   return null;
 }
 
-function setPlayerFlash(userId, color, durationMs = 110) {
+function setPlayerFlash(userId, color, durationMs = 110, kind = 'hit') {
   if (!Number.isFinite(Number(userId))) return;
+  const startAt = performance.now();
   playerFlashEffects.set(Number(userId), {
     color,
-    until: performance.now() + durationMs,
+    kind,
+    startAt,
+    durationMs: Math.max(1, durationMs),
+    until: startAt + Math.max(1, durationMs),
   });
 }
 
@@ -782,7 +885,10 @@ function getPlayerFlash(userId) {
     playerFlashEffects.delete(key);
     return null;
   }
-  return effect;
+  return {
+    ...effect,
+    progress: Math.max(0, Math.min(1, (performance.now() - effect.startAt) / Math.max(1, effect.durationMs))),
+  };
 }
 
 function applyPlayerKnockback(attackerId, targetId, strengthPx = 16, durationMs = 140) {
@@ -939,7 +1045,9 @@ async function connect() {
     }
 
     if (event === 'state') {
+      const previousSnapshot = state;
       state = payload;
+      triggerShieldRegenEffects(previousSnapshot, payload);
       if (!renderState) {
         renderState = cloneGameState(payload);
       }
@@ -953,13 +1061,20 @@ async function connect() {
       const myHit = attackerId === Number(myUserId);
       const enemyHit = targetId === Number(myUserId);
       const source = String(payload.source || 'projectile');
-      setPlayerFlash(targetId, myHit ? '#86efac' : '#fca5a5');
+      const shieldBlocked = Boolean(payload.shield_blocked);
+      if (shieldBlocked) {
+        setPlayerFlash(targetId, '#bfe4ff', 180, 'shield');
+      } else {
+        setPlayerFlash(targetId, myHit ? '#86efac' : '#fca5a5');
+      }
       applyPlayerKnockback(attackerId, targetId);
 
-      if (myHit) {
+      if (myHit && !shieldBlocked) {
         showHitFeedback('#22c55e', 'Hit!');
-      } else if (enemyHit) {
+      } else if (enemyHit && !shieldBlocked) {
         showHitFeedback('#ef4444', source === 'mine' ? 'Mina!' : 'Hit!');
+      } else if (enemyHit && shieldBlocked) {
+        showHitFeedback('#93c5fd', 'Escudo!');
       }
       return;
     }

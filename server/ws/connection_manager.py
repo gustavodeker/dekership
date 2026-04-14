@@ -139,6 +139,7 @@ class ConnectionManager:
         attacker_id: int,
         target_id: int,
         source: str = "projectile",
+        shield_blocked: bool = False,
     ) -> None:
         attacker = match.players[attacker_id]
         target = match.players[target_id]
@@ -154,6 +155,7 @@ class ConnectionManager:
                     "target": target.hits,
                 },
                 "source": source,
+                "shield_blocked": shield_blocked,
             },
         )
 
