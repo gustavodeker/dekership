@@ -197,3 +197,126 @@ class ConnectionManager:
                 await websocket.send_json(make_event("room_list_result", {"rooms": rooms_payload}))
             except Exception:
                 self.connections_by_user.pop(user_id, None)
+
+    async def broadcast_open_world_state(self, open_world_state, tick_rate: int) -> None:
+        payload = {
+            "world_id": open_world_state.world_id,
+            "tick": open_world_state.tick,
+            "tick_rate": tick_rate,
+            "max_players": open_world_state.max_players,
+            "players": [
+                {
+                    "user_id": player.user_id,
+                    "username": player.username,
+                    "x": player.x,
+                    "y": player.y,
+                    "aim_x": player.aim_x,
+                    "aim_y": player.aim_y,
+                    "kills": player.kills,
+                    "deaths": player.deaths,
+                    "damage_taken": player.damage_taken,
+                    "shield_points": player.shield_points,
+                    "last_mine_tick": player.last_mine_tick,
+                    "last_damage_tick": player.last_damage_tick,
+                    "last_shield_regen_tick": player.last_shield_regen_tick,
+                    "alive": player.alive,
+                    "dead_until_tick": player.dead_until_tick,
+                    "invulnerable_until_tick": player.invulnerable_until_tick,
+                }
+                for player in open_world_state.players.values()
+            ],
+            "projectiles": [
+                {
+                    "projectile_id": projectile.projectile_id,
+                    "owner_user_id": projectile.owner_user_id,
+                    "x": projectile.x,
+                    "y": projectile.y,
+                    "velocity_x": projectile.velocity_x,
+                    "velocity_y": projectile.velocity_y,
+                }
+                for projectile in open_world_state.projectiles
+            ],
+            "mines": [
+                {
+                    "mine_id": mine.mine_id,
+                    "owner_user_id": mine.owner_user_id,
+                    "x": mine.x,
+                    "y": mine.y,
+                    "created_tick": mine.created_tick,
+                    "hits_taken": mine.hits_taken,
+                }
+                for mine in open_world_state.mines
+            ],
+            "obstacles": [
+                {
+                    "x": obstacle.x,
+                    "y": obstacle.y,
+                    "width": obstacle.width,
+                    "height": obstacle.height,
+                }
+                for obstacle in open_world_state.obstacles
+            ],
+        }
+        for player in open_world_state.players.values():
+            websocket = self.connections_by_user.get(player.user_id)
+            if websocket is None:
+                continue
+            await self.send_json(websocket, "open_world_state", payload)
+
+    async def broadcast_open_world_hit(
+        self,
+        open_world_state,
+        attacker_id: int,
+        target_id: int,
+        source: str,
+        shield_blocked: bool,
+    ) -> None:
+        payload = {
+            "attacker": attacker_id,
+            "target": target_id,
+            "source": source,
+            "shield_blocked": shield_blocked,
+        }
+        for player in open_world_state.players.values():
+            websocket = self.connections_by_user.get(player.user_id)
+            if websocket is None:
+                continue
+            await self.send_json(websocket, "open_world_hit", payload)
+
+    async def broadcast_open_world_mine_hit(
+        self,
+        open_world_state,
+        attacker_id: int,
+        mine_owner_id: int,
+        mine_id: int,
+        destroyed: bool,
+    ) -> None:
+        payload = {
+            "attacker": attacker_id,
+            "mine_owner": mine_owner_id,
+            "mine_id": mine_id,
+            "destroyed": destroyed,
+        }
+        for player in open_world_state.players.values():
+            websocket = self.connections_by_user.get(player.user_id)
+            if websocket is None:
+                continue
+            await self.send_json(websocket, "open_world_mine_hit", payload)
+
+    async def broadcast_open_world_death(
+        self,
+        open_world_state,
+        target_id: int,
+        killer_id: int,
+        respawn_seconds: int,
+    ) -> None:
+        payload = {
+            "target_id": target_id,
+            "killer_id": killer_id,
+            "respawn_seconds": respawn_seconds,
+        }
+        for player in open_world_state.players.values():
+            websocket = self.connections_by_user.get(player.user_id)
+            if websocket is None:
+                continue
+            await self.send_json(websocket, "open_world_death", payload)

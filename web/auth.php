@@ -116,6 +116,34 @@ function ensure_admin_schema(): void
     );
     db()->exec(
         "INSERT INTO game_settings (setting_key, setting_value) VALUES
+        ('1v1_projectile_speed', '1.6'),
+        ('1v1_movement_speed', '3.0'),
+        ('1v1_hits_to_win', '3'),
+        ('1v1_fire_cooldown_ticks', '6'),
+        ('1v1_mine_cooldown_ticks', '100'),
+        ('1v1_render_smoothing', '0.25'),
+        ('1v1_player_hitbox_radius', '5.4'),
+        ('1v1_projectile_hitbox_radius', '0.6'),
+        ('1v1_mine_hitbox_radius', '2.4'),
+        ('1v1_mine_hits_to_destroy', '2'),
+        ('1v1_shield_points', '2'),
+        ('1v1_shield_regen_seconds', '10'),
+        ('1v1_respawn_invulnerability_seconds', '2'),
+        ('1v1_show_hitbox', '1'),
+        ('open_world_projectile_speed', '1.6'),
+        ('open_world_movement_speed', '3.0'),
+        ('open_world_hits_to_win', '3'),
+        ('open_world_fire_cooldown_ticks', '6'),
+        ('open_world_mine_cooldown_ticks', '100'),
+        ('open_world_render_smoothing', '0.25'),
+        ('open_world_player_hitbox_radius', '5.4'),
+        ('open_world_projectile_hitbox_radius', '0.6'),
+        ('open_world_mine_hitbox_radius', '2.4'),
+        ('open_world_mine_hits_to_destroy', '2'),
+        ('open_world_shield_points', '2'),
+        ('open_world_shield_regen_seconds', '10'),
+        ('open_world_respawn_invulnerability_seconds', '2'),
+        ('open_world_show_hitbox', '1'),
         ('projectile_speed', '1.6'),
         ('movement_speed', '3.0'),
         ('hits_to_win', '3'),
@@ -129,6 +157,7 @@ function ensure_admin_schema(): void
         ('mine_hits_to_destroy', '2'),
         ('shield_points', '2'),
         ('shield_regen_seconds', '10'),
+        ('respawn_invulnerability_seconds', '2'),
         ('show_hitbox', '1')
         ON DUPLICATE KEY UPDATE setting_value = setting_value"
     );

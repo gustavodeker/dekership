@@ -73,7 +73,7 @@ class SimulationService:
             raise
 
     async def _apply_inputs(self, room, match: MatchState) -> None:
-        game_settings = await self.game_config.get_settings()
+        game_settings = await self.game_config.get_settings("1v1")
         movement_speed = game_settings["movement_speed"]
         fire_cooldown_ticks = max(1, int(game_settings["fire_cooldown_ticks"]))
         mine_cooldown_ticks = max(1, int(game_settings["mine_cooldown_ticks"]))
@@ -142,7 +142,7 @@ class SimulationService:
                     match.next_mine_id += 1
 
     async def _advance_mines(self, room, match: MatchState) -> None:
-        game_settings = await self.game_config.get_settings()
+        game_settings = await self.game_config.get_settings("1v1")
         hits_to_win = max(1, int(game_settings["hits_to_win"]))
         shield_points_max = max(0, int(game_settings["shield_points"]))
         player_hitbox_radius = game_settings["player_hitbox_radius"]
@@ -178,7 +178,7 @@ class SimulationService:
         match.mines = active
 
     async def _advance_projectiles(self, room, match: MatchState) -> None:
-        game_settings = await self.game_config.get_settings()
+        game_settings = await self.game_config.get_settings("1v1")
         hits_to_win = max(1, int(game_settings["hits_to_win"]))
         mine_hits_to_destroy = max(1, int(game_settings["mine_hits_to_destroy"]))
         shield_points_max = max(0, int(game_settings["shield_points"]))
@@ -251,7 +251,7 @@ class SimulationService:
         match.projectiles = active
 
     async def _apply_shield_regen(self, match: MatchState) -> None:
-        game_settings = await self.game_config.get_settings()
+        game_settings = await self.game_config.get_settings("1v1")
         shield_points_max = max(0, int(game_settings["shield_points"]))
         shield_regen_ticks = max(1, int(game_settings["shield_regen_seconds"]) * settings.ws_tick_rate)
         for player in match.players.values():

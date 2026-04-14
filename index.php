@@ -10,9 +10,12 @@ $routes = [
     'cadastro' => __DIR__ . '/web/cadastro.php',
     'lobby' => __DIR__ . '/web/lobby/lobby.php',
     'game' => __DIR__ . '/web/game/game.php',
+    'openworld' => __DIR__ . '/web/game/openworld.php',
     'profile' => __DIR__ . '/web/profile/profile.php',
     'ranking' => __DIR__ . '/web/ranking/ranking.php',
     'settings' => __DIR__ . '/web/settings.php',
+    'settings_1v1' => __DIR__ . '/web/settings_1v1.php',
+    'settings_openworld' => __DIR__ . '/web/settings_openworld.php',
 ];
 
 if (!isset($routes[$page])) {

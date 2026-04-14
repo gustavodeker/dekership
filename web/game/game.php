@@ -21,6 +21,7 @@ render_header('Game');
 window.DK_SESSION = <?= json_encode([
     'user' => $user,
     'sessionEndpoint' => '/web/api/session.php',
+    'gameMode' => '1v1',
 ], JSON_UNESCAPED_SLASHES) ?>;
 </script>
 <script src="/web/game/game.js"></script>

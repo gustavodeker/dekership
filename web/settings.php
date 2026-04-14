@@ -10,63 +10,6 @@ $error = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        if (isset($_POST['save_settings'])) {
-            $projectileSpeed = (float) ($_POST['projectile_speed'] ?? 1.6);
-            $movementSpeed = (float) ($_POST['movement_speed'] ?? 3.0);
-            $hitsToWin = (int) ($_POST['hits_to_win'] ?? 3);
-            $fireCooldownTicks = (int) ($_POST['fire_cooldown_ticks'] ?? 6);
-            $mineCooldownTicks = (int) ($_POST['mine_cooldown_ticks'] ?? 100);
-            $wsMode = (string) ($_POST['ws_mode'] ?? 'vps');
-            $renderSmoothing = (float) ($_POST['render_smoothing'] ?? 0.25);
-            $playerHitboxRadius = (float) ($_POST['player_hitbox_radius'] ?? 5.4);
-            $projectileHitboxRadius = (float) ($_POST['projectile_hitbox_radius'] ?? 0.6);
-            $mineHitboxRadius = (float) ($_POST['mine_hitbox_radius'] ?? 2.4);
-            $mineHitsToDestroy = (int) ($_POST['mine_hits_to_destroy'] ?? 2);
-            $shieldPoints = (int) ($_POST['shield_points'] ?? 2);
-            $shieldRegenSeconds = (int) ($_POST['shield_regen_seconds'] ?? 10);
-            $showHitbox = isset($_POST['show_hitbox']) ? 1 : 0;
-
-            if (
-                $projectileSpeed <= 0
-                || $movementSpeed <= 0
-                || $hitsToWin <= 0
-                || $fireCooldownTicks <= 0
-                || $mineCooldownTicks <= 0
-                || !in_array($wsMode, ['vps', 'local'], true)
-                || $renderSmoothing < 0
-                || $renderSmoothing > 1
-                || $playerHitboxRadius <= 0
-                || $projectileHitboxRadius <= 0
-                || $mineHitboxRadius <= 0
-                || $mineHitsToDestroy <= 0
-                || $shieldPoints < 0
-                || $shieldRegenSeconds <= 0
-            ) {
-                throw new RuntimeException('Valores invalidos');
-            }
-
-            $stmt = db()->prepare(
-                'INSERT INTO game_settings (setting_key, setting_value)
-                 VALUES (:setting_key, :setting_value)
-                 ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)'
-            );
-            $stmt->execute(['setting_key' => 'projectile_speed', 'setting_value' => (string) $projectileSpeed]);
-            $stmt->execute(['setting_key' => 'movement_speed', 'setting_value' => (string) $movementSpeed]);
-            $stmt->execute(['setting_key' => 'hits_to_win', 'setting_value' => (string) $hitsToWin]);
-            $stmt->execute(['setting_key' => 'fire_cooldown_ticks', 'setting_value' => (string) $fireCooldownTicks]);
-            $stmt->execute(['setting_key' => 'mine_cooldown_ticks', 'setting_value' => (string) $mineCooldownTicks]);
-            $stmt->execute(['setting_key' => 'ws_mode', 'setting_value' => $wsMode]);
-            $stmt->execute(['setting_key' => 'render_smoothing', 'setting_value' => (string) $renderSmoothing]);
-            $stmt->execute(['setting_key' => 'player_hitbox_radius', 'setting_value' => (string) $playerHitboxRadius]);
-            $stmt->execute(['setting_key' => 'projectile_hitbox_radius', 'setting_value' => (string) $projectileHitboxRadius]);
-            $stmt->execute(['setting_key' => 'mine_hitbox_radius', 'setting_value' => (string) $mineHitboxRadius]);
-            $stmt->execute(['setting_key' => 'mine_hits_to_destroy', 'setting_value' => (string) $mineHitsToDestroy]);
-            $stmt->execute(['setting_key' => 'shield_points', 'setting_value' => (string) $shieldPoints]);
-            $stmt->execute(['setting_key' => 'shield_regen_seconds', 'setting_value' => (string) $shieldRegenSeconds]);
-            $stmt->execute(['setting_key' => 'show_hitbox', 'setting_value' => (string) $showHitbox]);
-            $success = 'Configuracoes salvas';
-        }
-
         if (isset($_POST['toggle_admin'])) {
             $targetUserId = (int) ($_POST['target_user_id'] ?? 0);
             $makeAdmin = (int) ($_POST['make_admin'] ?? 0) === 1;
@@ -98,12 +41,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$settingsRows = db()->query('SELECT setting_key, setting_value FROM game_settings')->fetchAll();
-$settings = [];
-foreach ($settingsRows as $row) {
-    $settings[$row['setting_key']] = $row['setting_value'];
-}
-
 $config = app_config();
 $sql = sprintf(
     'SELECT u.%1$s AS user_id, u.%2$s AS username, u.email,
@@ -121,76 +58,27 @@ render_header('Configuracoes');
 ?>
 <section class="grid">
     <div class="panel">
-        <h1>Configuracoes do jogo</h1>
+        <h1>Configuracoes</h1>
         <?php if ($success !== null): ?>
             <div class="success"><?= htmlspecialchars($success, ENT_QUOTES, 'UTF-8') ?></div>
         <?php endif; ?>
         <?php if ($error !== null): ?>
             <div class="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
         <?php endif; ?>
-        <form method="post" class="stack">
-            <label>
-                <span>Velocidade de projetil</span>
-                <input type="number" step="0.1" min="0.1" name="projectile_speed" value="<?= htmlspecialchars((string) ($settings['projectile_speed'] ?? '1.6'), ENT_QUOTES, 'UTF-8') ?>" required>
-            </label>
-            <label>
-                <span>Velocidade de movimento</span>
-                <input type="number" step="0.1" min="0.1" name="movement_speed" value="<?= htmlspecialchars((string) ($settings['movement_speed'] ?? '3.0'), ENT_QUOTES, 'UTF-8') ?>" required>
-            </label>
-            <label>
-                <span>Vida (acertos para vencer)</span>
-                <input type="number" step="1" min="1" name="hits_to_win" value="<?= htmlspecialchars((string) ($settings['hits_to_win'] ?? '3'), ENT_QUOTES, 'UTF-8') ?>" required>
-            </label>
-            <label>
-                <span>Intervalo entre disparos por clique (ticks)</span>
-                <input type="number" step="1" min="1" name="fire_cooldown_ticks" value="<?= htmlspecialchars((string) ($settings['fire_cooldown_ticks'] ?? '6'), ENT_QUOTES, 'UTF-8') ?>" required>
-            </label>
-            <label>
-                <span>Cooldown da mina (ticks)</span>
-                <input type="number" step="1" min="1" name="mine_cooldown_ticks" value="<?= htmlspecialchars((string) ($settings['mine_cooldown_ticks'] ?? '100'), ENT_QUOTES, 'UTF-8') ?>" required>
-            </label>
-            <label>
-                <span>WebSocket ativo</span>
-                <select name="ws_mode" required>
-                    <?php $wsModeSelected = (string) ($settings['ws_mode'] ?? 'vps'); ?>
-                    <option value="vps" <?= $wsModeSelected === 'vps' ? 'selected' : '' ?>>VPS</option>
-                    <option value="local" <?= $wsModeSelected === 'local' ? 'selected' : '' ?>>Local</option>
-                </select>
-            </label>
-            <label>
-                <span>Suavizacao visual (0-1)</span>
-                <input type="number" step="0.01" min="0" max="1" name="render_smoothing" value="<?= htmlspecialchars((string) ($settings['render_smoothing'] ?? '0.25'), ENT_QUOTES, 'UTF-8') ?>" required>
-            </label>
-            <label>
-                <span>Hitbox da nave</span>
-                <input type="number" step="0.1" min="0.1" name="player_hitbox_radius" value="<?= htmlspecialchars((string) ($settings['player_hitbox_radius'] ?? '5.4'), ENT_QUOTES, 'UTF-8') ?>" required>
-            </label>
-            <label>
-                <span>Hitbox do projetil</span>
-                <input type="number" step="0.1" min="0.1" name="projectile_hitbox_radius" value="<?= htmlspecialchars((string) ($settings['projectile_hitbox_radius'] ?? '0.6'), ENT_QUOTES, 'UTF-8') ?>" required>
-            </label>
-            <label>
-                <span>Hitbox da mina</span>
-                <input type="number" step="0.1" min="0.1" name="mine_hitbox_radius" value="<?= htmlspecialchars((string) ($settings['mine_hitbox_radius'] ?? '2.4'), ENT_QUOTES, 'UTF-8') ?>" required>
-            </label>
-            <label>
-                <span>Hits para destruir mina</span>
-                <input type="number" step="1" min="1" name="mine_hits_to_destroy" value="<?= htmlspecialchars((string) ($settings['mine_hits_to_destroy'] ?? '2'), ENT_QUOTES, 'UTF-8') ?>" required>
-            </label>
-            <label>
-                <span>Pontos de escudo</span>
-                <input type="number" step="1" min="0" name="shield_points" value="<?= htmlspecialchars((string) ($settings['shield_points'] ?? '2'), ENT_QUOTES, 'UTF-8') ?>" required>
-            </label>
-            <label>
-                <span>Tempo para regenerar 1 escudo (segundos)</span>
-                <input type="number" step="1" min="1" name="shield_regen_seconds" value="<?= htmlspecialchars((string) ($settings['shield_regen_seconds'] ?? '10'), ENT_QUOTES, 'UTF-8') ?>" required>
-            </label>
-            <label>
-                <span>Mostrar linha de hitbox</span>
-                <input type="checkbox" name="show_hitbox" value="1" <?= (($settings['show_hitbox'] ?? '1') === '1') ? 'checked' : '' ?>>
-            </label>
-            <button type="submit" name="save_settings" value="1">Salvar</button>
-        </form>
+        <div class="stack">
+            <a class="room-card" href="/index.php?page=settings_1v1">
+                <div>
+                    <strong>Config 1v1</strong>
+                    <div class="muted">Parametros exclusivos do modo 1v1</div>
+                </div>
+            </a>
+            <a class="room-card" href="/index.php?page=settings_openworld">
+                <div>
+                    <strong>Config Mundo Aberto</strong>
+                    <div class="muted">Parametros exclusivos do modo continuo</div>
+                </div>
+            </a>
+        </div>
     </div>
 
     <div class="panel">

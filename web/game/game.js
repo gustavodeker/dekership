@@ -303,7 +303,8 @@ function shouldShowStartCountdown(matchId) {
 }
 
 async function fetchSession() {
-  const endpoint = `${window.DK_SESSION.sessionEndpoint}?_=${Date.now()}`;
+  const mode = encodeURIComponent(window.DK_SESSION.gameMode || '1v1');
+  const endpoint = `${window.DK_SESSION.sessionEndpoint}?mode=${mode}&_=${Date.now()}`;
   const response = await fetch(endpoint, { credentials: 'same-origin', cache: 'no-store' });
   const data = await response.json();
   if (!data.ok) {

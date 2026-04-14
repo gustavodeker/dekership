@@ -41,6 +41,34 @@ class GameConfigService:
                     """
                     INSERT INTO game_settings (setting_key, setting_value)
                     VALUES
+                      ('1v1_projectile_speed', '1.6'),
+                      ('1v1_movement_speed', '3.0'),
+                      ('1v1_hits_to_win', '3'),
+                      ('1v1_fire_cooldown_ticks', '6'),
+                      ('1v1_mine_cooldown_ticks', '100'),
+                      ('1v1_render_smoothing', '0.25'),
+                      ('1v1_player_hitbox_radius', '5.4'),
+                      ('1v1_projectile_hitbox_radius', '0.6'),
+                      ('1v1_mine_hitbox_radius', '2.4'),
+                      ('1v1_mine_hits_to_destroy', '2'),
+                      ('1v1_shield_points', '2'),
+                      ('1v1_shield_regen_seconds', '10'),
+                      ('1v1_respawn_invulnerability_seconds', '2'),
+                      ('1v1_show_hitbox', '1'),
+                      ('open_world_projectile_speed', '1.6'),
+                      ('open_world_movement_speed', '3.0'),
+                      ('open_world_hits_to_win', '3'),
+                      ('open_world_fire_cooldown_ticks', '6'),
+                      ('open_world_mine_cooldown_ticks', '100'),
+                      ('open_world_render_smoothing', '0.25'),
+                      ('open_world_player_hitbox_radius', '5.4'),
+                      ('open_world_projectile_hitbox_radius', '0.6'),
+                      ('open_world_mine_hitbox_radius', '2.4'),
+                      ('open_world_mine_hits_to_destroy', '2'),
+                      ('open_world_shield_points', '2'),
+                      ('open_world_shield_regen_seconds', '10'),
+                      ('open_world_respawn_invulnerability_seconds', '2'),
+                      ('open_world_show_hitbox', '1'),
                       ('projectile_speed', '1.6'),
                       ('movement_speed', '3.0'),
                       ('hits_to_win', '3'),
@@ -54,6 +82,7 @@ class GameConfigService:
                       ('mine_hits_to_destroy', '2'),
                       ('shield_points', '2'),
                       ('shield_regen_seconds', '10'),
+                      ('respawn_invulnerability_seconds', '2'),
                       ('show_hitbox', '1')
                     ON DUPLICATE KEY UPDATE setting_value = setting_value
                     """
@@ -70,23 +99,33 @@ class GameConfigService:
                 )
                 await connection.commit()
 
-    async def get_settings(self) -> dict[str, float]:
+    async def get_settings(self, mode: str = "1v1") -> dict[str, float]:
         now = time.time()
         if now - self._loaded_at > self.ttl_seconds:
             rows = await fetch_all("SELECT setting_key, setting_value FROM game_settings")
             self._cache = {str(row["setting_key"]): str(row["setting_value"]) for row in rows}
             self._loaded_at = now
+
+        prefix = "open_world_" if mode == "open_world" else "1v1_"
+
+        def read_setting(key: str, default: str) -> str:
+            prefixed_key = f"{prefix}{key}"
+            if prefixed_key in self._cache:
+                return self._cache[prefixed_key]
+            return self._cache.get(key, default)
+
         return {
-            "projectile_speed": float(self._cache.get("projectile_speed", "1.6")),
-            "movement_speed": float(self._cache.get("movement_speed", "3.0")),
-            "hits_to_win": max(1, int(float(self._cache.get("hits_to_win", "3")))),
-            "fire_cooldown_ticks": max(1, int(float(self._cache.get("fire_cooldown_ticks", "6")))),
-            "mine_cooldown_ticks": max(1, int(float(self._cache.get("mine_cooldown_ticks", "100")))),
-            "render_smoothing": float(self._cache.get("render_smoothing", "0.25")),
-            "player_hitbox_radius": float(self._cache.get("player_hitbox_radius", "5.4")),
-            "projectile_hitbox_radius": float(self._cache.get("projectile_hitbox_radius", "0.6")),
-            "mine_hitbox_radius": float(self._cache.get("mine_hitbox_radius", "2.4")),
-            "mine_hits_to_destroy": max(1, int(float(self._cache.get("mine_hits_to_destroy", "2")))),
-            "shield_points": max(0, int(float(self._cache.get("shield_points", "2")))),
-            "shield_regen_seconds": max(1, int(float(self._cache.get("shield_regen_seconds", "10")))),
+            "projectile_speed": float(read_setting("projectile_speed", "1.6")),
+            "movement_speed": float(read_setting("movement_speed", "3.0")),
+            "hits_to_win": max(1, int(float(read_setting("hits_to_win", "3")))),
+            "fire_cooldown_ticks": max(1, int(float(read_setting("fire_cooldown_ticks", "6")))),
+            "mine_cooldown_ticks": max(1, int(float(read_setting("mine_cooldown_ticks", "100")))),
+            "render_smoothing": float(read_setting("render_smoothing", "0.25")),
+            "player_hitbox_radius": float(read_setting("player_hitbox_radius", "5.4")),
+            "projectile_hitbox_radius": float(read_setting("projectile_hitbox_radius", "0.6")),
+            "mine_hitbox_radius": float(read_setting("mine_hitbox_radius", "2.4")),
+            "mine_hits_to_destroy": max(1, int(float(read_setting("mine_hits_to_destroy", "2")))),
+            "shield_points": max(0, int(float(read_setting("shield_points", "2")))),
+            "shield_regen_seconds": max(1, int(float(read_setting("shield_regen_seconds", "10")))),
+            "respawn_invulnerability_seconds": max(1, int(float(read_setting("respawn_invulnerability_seconds", "2")))),
         }

@@ -45,44 +45,34 @@ $shieldPoints = 2;
 $shieldRegenSeconds = 10;
 $showHitbox = true;
 $wsMode = 'vps';
+$mode = (string) ($_GET['mode'] ?? '1v1');
+if (!in_array($mode, ['1v1', 'open_world'], true)) {
+    $mode = '1v1';
+}
+$prefix = $mode === 'open_world' ? 'open_world_' : '1v1_';
 try {
-    $settingStmt = db()->prepare(
-        "SELECT setting_key, setting_value
-         FROM game_settings
-         WHERE setting_key IN ('render_smoothing', 'player_hitbox_radius', 'projectile_hitbox_radius', 'mine_hitbox_radius', 'mine_cooldown_ticks', 'hits_to_win', 'mine_hits_to_destroy', 'shield_points', 'shield_regen_seconds', 'show_hitbox', 'ws_mode')"
-    );
-    $settingStmt->execute();
+    $settingStmt = db()->query("SELECT setting_key, setting_value FROM game_settings");
     $settings = $settingStmt->fetchAll(PDO::FETCH_KEY_PAIR);
-    if (isset($settings['render_smoothing'])) {
-        $renderSmoothing = (float) $settings['render_smoothing'];
-    }
-    if (isset($settings['player_hitbox_radius'])) {
-        $playerHitboxRadius = (float) $settings['player_hitbox_radius'];
-    }
-    if (isset($settings['projectile_hitbox_radius'])) {
-        $projectileHitboxRadius = (float) $settings['projectile_hitbox_radius'];
-    }
-    if (isset($settings['mine_hitbox_radius'])) {
-        $mineHitboxRadius = (float) $settings['mine_hitbox_radius'];
-    }
-    if (isset($settings['mine_cooldown_ticks'])) {
-        $mineCooldownTicks = (int) (float) $settings['mine_cooldown_ticks'];
-    }
-    if (isset($settings['hits_to_win'])) {
-        $hitsToWin = (int) (float) $settings['hits_to_win'];
-    }
-    if (isset($settings['mine_hits_to_destroy'])) {
-        $mineHitsToDestroy = (int) (float) $settings['mine_hits_to_destroy'];
-    }
-    if (isset($settings['shield_points'])) {
-        $shieldPoints = (int) (float) $settings['shield_points'];
-    }
-    if (isset($settings['shield_regen_seconds'])) {
-        $shieldRegenSeconds = (int) (float) $settings['shield_regen_seconds'];
-    }
-    if (isset($settings['show_hitbox'])) {
-        $showHitbox = (string) $settings['show_hitbox'] !== '0';
-    }
+    $readModeSetting = static function (string $key, string $default) use ($settings, $prefix): string {
+        $prefixedKey = $prefix . $key;
+        if (isset($settings[$prefixedKey])) {
+            return (string) $settings[$prefixedKey];
+        }
+        if (isset($settings[$key])) {
+            return (string) $settings[$key];
+        }
+        return $default;
+    };
+    $renderSmoothing = (float) $readModeSetting('render_smoothing', '0.25');
+    $playerHitboxRadius = (float) $readModeSetting('player_hitbox_radius', '5.4');
+    $projectileHitboxRadius = (float) $readModeSetting('projectile_hitbox_radius', '0.6');
+    $mineHitboxRadius = (float) $readModeSetting('mine_hitbox_radius', '2.4');
+    $mineCooldownTicks = (int) (float) $readModeSetting('mine_cooldown_ticks', '100');
+    $hitsToWin = (int) (float) $readModeSetting('hits_to_win', '3');
+    $mineHitsToDestroy = (int) (float) $readModeSetting('mine_hits_to_destroy', '2');
+    $shieldPoints = (int) (float) $readModeSetting('shield_points', '2');
+    $shieldRegenSeconds = (int) (float) $readModeSetting('shield_regen_seconds', '10');
+    $showHitbox = $readModeSetting('show_hitbox', '1') !== '0';
     if (isset($settings['ws_mode'])) {
         $candidateWsMode = (string) $settings['ws_mode'];
         if (in_array($candidateWsMode, ['vps', 'local'], true)) {
@@ -132,6 +122,7 @@ echo json_encode([
     'shield_points' => $shieldPoints,
     'shield_regen_seconds' => $shieldRegenSeconds,
     'show_hitbox' => $showHitbox,
+    'mode' => $mode,
     'ws_mode' => $wsMode,
     'ws_url' => $wsUrl,
 ], JSON_UNESCAPED_SLASHES);

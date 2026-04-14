@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from server.auth import AuthUser, get_user_by_token
 from server.config import settings
 from server.domain.matches import MatchRegistry
+from server.domain.open_world import OpenWorldService
 from server.domain.rooms import RoomRegistry, persist_room_closed, persist_room_created, persist_room_started
 from server.domain.simulation import SimulationService
 from server.models import AuthPayload, Envelope, PlayerInputPayload, RoomCreatePayload, RoomJoinPayload
@@ -35,6 +36,7 @@ def build_ws_router(
     rooms: RoomRegistry,
     matches: MatchRegistry,
     simulation: SimulationService,
+    open_world: OpenWorldService,
     manager: ConnectionManager,
     input_rate_limit: int,
 ) -> APIRouter:
@@ -167,35 +169,95 @@ def build_ws_router(
                     await manager.broadcast_room_list(await rooms.list_rooms())
                     continue
 
+                if envelope.event == "open_world_join":
+                    room = await rooms.get_room_for_user(authed_user.user_id)
+                    if room is not None:
+                        if room.status == "playing":
+                            await manager.send_error(
+                                websocket,
+                                "INVALID_STATE",
+                                "saia da partida 1v1 antes de entrar no mundo aberto",
+                            )
+                            continue
+                        previous_room, previous_room_closed = await rooms.leave_room(authed_user.user_id)
+                        if previous_room_closed and previous_room is not None:
+                            await persist_room_closed(previous_room)
+                            await manager.broadcast(
+                                previous_room,
+                                "room_closed",
+                                {"room_id": previous_room.room_id, "reason": "owner_left"},
+                            )
+                        await manager.broadcast_room_list(await rooms.list_rooms())
+                    try:
+                        await open_world.join(authed_user.user_id, authed_user.username)
+                    except ValueError as exc:
+                        await manager.send_error(websocket, str(exc), "falha ao entrar no mundo aberto")
+                        continue
+                    await manager.send_json(
+                        websocket,
+                        "open_world_joined",
+                        {"world_id": "global", "max_players": open_world.max_players, "tick_rate": settings.ws_tick_rate},
+                    )
+                    continue
+
+                if envelope.event == "open_world_leave":
+                    left = await open_world.leave(authed_user.user_id)
+                    if not left:
+                        await manager.send_error(websocket, "INVALID_STATE", "jogador fora do mundo aberto")
+                        continue
+                    await manager.send_json(websocket, "open_world_left", {"world_id": "global"})
+                    continue
+
+                if envelope.event == "open_world_respawn":
+                    ok, reason = await open_world.respawn(authed_user.user_id)
+                    if not ok:
+                        await manager.send_error(websocket, reason, "falha ao renascer")
+                    continue
+
                 if envelope.event == "player_input":
                     payload = PlayerInputPayload.model_validate(envelope.payload)
                     if not limiter.allow(authed_user.user_id) and not payload.shoot and not payload.drop_mine:
                         continue
                     room = await rooms.get_room_for_user(authed_user.user_id)
-                    if room is None or authed_user.user_id not in room.players:
-                        await manager.send_error(websocket, "INVALID_STATE", "jogador sem sala")
+                    if room is not None and authed_user.user_id in room.players:
+                        player = room.players[authed_user.user_id]
+                        if payload.seq <= player.input_seq:
+                            continue
+                        player.input_seq = payload.seq
+                        player.move_x = payload.move_x
+                        player.move_y = payload.move_y
+                        player.aim_x = payload.aim_x
+                        player.aim_y = payload.aim_y
+                        if payload.shoot:
+                            player.shoot_requested = True
+                        if payload.drop_mine:
+                            player.mine_requested = True
                         continue
-                    player = room.players[authed_user.user_id]
-                    if payload.seq <= player.input_seq:
+                    if await open_world.has_player(authed_user.user_id):
+                        await open_world.apply_input(
+                            authed_user.user_id,
+                            payload.seq,
+                            payload.move_x,
+                            payload.move_y,
+                            payload.aim_x,
+                            payload.aim_y,
+                            payload.shoot,
+                            payload.drop_mine,
+                        )
                         continue
-                    player.input_seq = payload.seq
-                    player.move_x = payload.move_x
-                    player.move_y = payload.move_y
-                    player.aim_x = payload.aim_x
-                    player.aim_y = payload.aim_y
-                    if payload.shoot:
-                        player.shoot_requested = True
-                    if payload.drop_mine:
-                        player.mine_requested = True
+                    await manager.send_error(websocket, "INVALID_STATE", "jogador sem modo ativo")
                     continue
 
                 if envelope.event == "drop_mine":
                     room = await rooms.get_room_for_user(authed_user.user_id)
-                    if room is None or authed_user.user_id not in room.players:
-                        await manager.send_error(websocket, "INVALID_STATE", "jogador sem sala")
+                    if room is not None and authed_user.user_id in room.players:
+                        player = room.players[authed_user.user_id]
+                        player.mine_requested = True
                         continue
-                    player = room.players[authed_user.user_id]
-                    player.mine_requested = True
+                    if await open_world.has_player(authed_user.user_id):
+                        await open_world.request_mine_drop(authed_user.user_id)
+                        continue
+                    await manager.send_error(websocket, "INVALID_STATE", "jogador sem modo ativo")
                     continue
 
                 if envelope.event == "ping":
@@ -222,6 +284,7 @@ def build_ws_router(
                         )
                 else:
                     await rooms.mark_disconnected(authed_user.user_id)
+                await open_world.leave(authed_user.user_id)
                 await manager.broadcast_room_list(await rooms.list_rooms())
         except ValidationError:
             await manager.send_error(websocket, "INVALID_STATE", "payload invalido")

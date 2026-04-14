@@ -14,6 +14,7 @@ render_header('Lobby');
                 <input type="text" id="room-name" maxlength="80" required>
             </label>
             <button type="submit">Criar sala</button>
+            <button type="button" id="open-world-btn">Entrar no mundo aberto</button>
             <button type="button" id="leave-room-btn">Sair da sala</button>
         </form>
     </div>

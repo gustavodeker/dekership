@@ -9,6 +9,7 @@ from server.config import settings
 from server.db import close_pool, open_pool
 from server.domain.game_config import GameConfigService
 from server.domain.matches import MatchRegistry
+from server.domain.open_world import OpenWorldService
 from server.domain.ranking import get_profile, get_ranking
 from server.domain.rooms import RoomRegistry
 from server.domain.simulation import SimulationService
@@ -22,11 +23,13 @@ match_registry = MatchRegistry()
 connection_manager = ConnectionManager()
 game_config_service = GameConfigService()
 simulation_service = SimulationService(room_registry, match_registry, connection_manager, game_config_service)
+open_world_service = OpenWorldService(connection_manager, game_config_service, max_players=50)
 app.include_router(
     build_ws_router(
         room_registry,
         match_registry,
         simulation_service,
+        open_world_service,
         connection_manager,
         settings.input_rate_limit_per_second,
     )
@@ -37,10 +40,12 @@ app.include_router(
 async def startup_event() -> None:
     await open_pool()
     await game_config_service.ensure_schema()
+    await open_world_service.start()
 
 
 @app.on_event("shutdown")
 async def shutdown_event() -> None:
+    await open_world_service.stop()
     await close_pool()
 
 

@@ -7,7 +7,7 @@
     <title><?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?></title>
     <link rel="stylesheet" href="/web/assets/app.css">
 </head>
-<body class="<?= $title === 'Game' ? 'game-page' : '' ?>">
+<body class="<?= in_array($title, ['Game', 'Mundo Aberto'], true) ? 'game-page' : '' ?>">
 <div class="layout">
     <header class="topbar">
         <div class="brand">Dekership 1v1</div>

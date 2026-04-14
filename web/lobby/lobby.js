@@ -3,6 +3,7 @@ const roomListEl = document.getElementById('room-list');
 const createRoomForm = document.getElementById('create-room-form');
 const roomNameEl = document.getElementById('room-name');
 const leaveRoomBtn = document.getElementById('leave-room-btn');
+const openWorldBtn = document.getElementById('open-world-btn');
 
 let ws;
 let requestId = 0;
@@ -121,6 +122,13 @@ async function connect() {
       return;
     }
 
+    if (event === 'open_world_joined') {
+      localStorage.removeItem('dk_room_id');
+      localStorage.removeItem('dk_match_id');
+      window.location.href = '/index.php?page=openworld';
+      return;
+    }
+
     if (event === 'error') {
       if (payload.code === 'ROOM_NOT_FOUND') {
         setRoomState(null);
@@ -145,6 +153,10 @@ createRoomForm.addEventListener('submit', (event) => {
 leaveRoomBtn.addEventListener('click', () => {
   if (!currentRoomId) return;
   send('room_leave');
+});
+
+openWorldBtn.addEventListener('click', () => {
+  send('open_world_join');
 });
 
 connect();
