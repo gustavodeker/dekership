@@ -35,6 +35,8 @@ const pressed = { left: false, right: false, up: false, down: false };
 const pointer = { x: 50, y: 50 };
 let pendingShot = false;
 let pendingMine = false;
+let selectedTargetType = null;
+let selectedTargetId = null;
 const floatingTexts = [];
 const knownMinePositions = new Map();
 
@@ -182,6 +184,8 @@ function sendInput(shoot = false, dropMine = false) {
     aim_y: pointer.y,
     shoot: safeShoot,
     drop_mine: dropMine,
+    target_type: selectedTargetType,
+    target_id: selectedTargetId,
   });
 }
 
@@ -248,10 +252,94 @@ function findPlayerByUserId(snapshot, userId) {
   return snapshot.players.find((player) => Number(player.user_id) === Number(userId)) || null;
 }
 
+function findMonsterById(snapshot, monsterId) {
+  if (!snapshot || !Array.isArray(snapshot.monsters)) return null;
+  return snapshot.monsters.find((monster) => Number(monster.monster_id) === Number(monsterId)) || null;
+}
+
+function setSelectedTarget(targetType, targetId) {
+  if (targetType !== 'player' && targetType !== 'monster') {
+    selectedTargetType = null;
+    selectedTargetId = null;
+    return;
+  }
+  const normalizedTargetId = Number(targetId);
+  if (!Number.isFinite(normalizedTargetId) || normalizedTargetId <= 0) {
+    selectedTargetType = null;
+    selectedTargetId = null;
+    return;
+  }
+  selectedTargetType = targetType;
+  selectedTargetId = normalizedTargetId;
+}
+
+function isSelectedTargetAlive(snapshot = worldState) {
+  if (!snapshot || !selectedTargetType || !selectedTargetId) return false;
+  if (selectedTargetType === 'player') {
+    const target = findPlayerByUserId(snapshot, selectedTargetId);
+    return Boolean(target && target.alive && Number(target.user_id) !== Number(myUserId));
+  }
+  if (selectedTargetType === 'monster') {
+    return Boolean(findMonsterById(snapshot, selectedTargetId));
+  }
+  return false;
+}
+
+function syncSelectedTargetWithState(snapshot) {
+  const selfPlayer = findPlayerByUserId(snapshot, myUserId);
+  if (!selfPlayer) {
+    setSelectedTarget(null, null);
+    return;
+  }
+  const targetKind = String(selfPlayer.target_kind || '');
+  const targetId = Number(selfPlayer.target_id);
+  if ((targetKind === 'player' || targetKind === 'monster') && Number.isFinite(targetId) && targetId > 0) {
+    setSelectedTarget(targetKind, targetId);
+    return;
+  }
+  setSelectedTarget(null, null);
+}
+
+function visualDistance(x1, y1, x2, y2) {
+  const visualXFactor = 768 / 1366;
+  const dx = (Number(x1) - Number(x2)) / visualXFactor;
+  const dy = Number(y1) - Number(y2);
+  return Math.hypot(dx, dy);
+}
+
+function findClickableTargetAtPointer() {
+  if (!worldState) return null;
+  let best = null;
+  const baseX = pointer.x;
+  const baseY = pointer.y;
+
+  for (const player of (worldState.players || [])) {
+    if (!player || !player.alive) continue;
+    if (Number(player.user_id) === Number(myUserId)) continue;
+    const distance = visualDistance(baseX, baseY, player.x, player.y);
+    const hitDistance = Math.max(2.2, playerHitRadius + 0.8);
+    if (distance > hitDistance) continue;
+    if (!best || distance < best.distance) {
+      best = { targetType: 'player', targetId: Number(player.user_id), distance };
+    }
+  }
+
+  for (const monster of (worldState.monsters || [])) {
+    const distance = visualDistance(baseX, baseY, monster.x, monster.y);
+    const hitDistance = Math.max(2.2, playerHitRadius + 0.8);
+    if (distance > hitDistance) continue;
+    if (!best || distance < best.distance) {
+      best = { targetType: 'monster', targetId: Number(monster.monster_id), distance };
+    }
+  }
+  return best;
+}
+
 function cloneWorldState(snapshot) {
   return {
     ...snapshot,
     players: (snapshot.players || []).map((player) => ({ ...player })),
+    monsters: (snapshot.monsters || []).map((monster) => ({ ...monster })),
     projectiles: (snapshot.projectiles || []).map((projectile) => ({ ...projectile })),
     mines: (snapshot.mines || []).map((mine) => ({ ...mine })),
     obstacles: (snapshot.obstacles || []).map((obstacle) => ({ ...obstacle })),
@@ -294,11 +382,31 @@ function blendProjectiles(currentProjectiles, targetProjectiles, alpha) {
   });
 }
 
+function blendMonsters(currentMonsters, targetMonsters, alpha) {
+  const currentById = new Map(
+    (currentMonsters || [])
+      .filter((monster) => Number.isFinite(Number(monster.monster_id)))
+      .map((monster) => [Number(monster.monster_id), monster])
+  );
+  return (targetMonsters || []).map((target) => {
+    const current = currentById.get(Number(target.monster_id));
+    if (!current) return { ...target };
+    return {
+      ...target,
+      x: lerp(Number(current.x), Number(target.x), alpha),
+      y: lerp(Number(current.y), Number(target.y), alpha),
+      aim_x: lerp(Number(current.aim_x), Number(target.aim_x), alpha),
+      aim_y: lerp(Number(current.aim_y), Number(target.aim_y), alpha),
+    };
+  });
+}
+
 function blendWorldState(current, target, alpha) {
   if (!current) return cloneWorldState(target);
   return {
     ...target,
     players: blendPlayers(current.players, target.players, alpha),
+    monsters: blendMonsters(current.monsters, target.monsters, alpha),
     projectiles: blendProjectiles(current.projectiles, target.projectiles, alpha),
     mines: (target.mines || []).map((mine) => ({ ...mine })),
     obstacles: (target.obstacles || []).map((obstacle) => ({ ...obstacle })),
@@ -578,20 +686,89 @@ function drawMine(mine) {
 function drawProjectile(projectile) {
   const x = arenaToCanvasX(projectile.x);
   const y = arenaToCanvasY(projectile.y);
-  const ownProjectile = Number(projectile.owner_user_id) === Number(myUserId);
-  context.fillStyle = ownProjectile ? '#22c55e' : '#ef4444';
+  const ownerKind = String(projectile.owner_kind || 'player');
+  const ownProjectile = ownerKind === 'player' && Number(projectile.owner_user_id) === Number(myUserId);
+  const color = ownerKind === 'monster' ? '#f59e0b' : (ownProjectile ? '#22c55e' : '#ef4444');
+  context.fillStyle = color;
   context.beginPath();
   context.arc(x, y, 4, 0, Math.PI * 2);
   context.fill();
   if (showHitbox) {
     context.save();
-    context.strokeStyle = ownProjectile ? 'rgba(34, 197, 94, 0.9)' : 'rgba(239, 68, 68, 0.9)';
+    context.strokeStyle = ownerKind === 'monster'
+      ? 'rgba(245, 158, 11, 0.9)'
+      : (ownProjectile ? 'rgba(34, 197, 94, 0.9)' : 'rgba(239, 68, 68, 0.9)');
     context.lineWidth = 1.5;
     context.beginPath();
     context.arc(x, y, arenaRadiusToCanvasRadius(projectileHitRadius), 0, Math.PI * 2);
     context.stroke();
     context.restore();
   }
+}
+
+function drawMonster(monster) {
+  const x = arenaToCanvasX(monster.x);
+  const y = arenaToCanvasY(monster.y);
+  const bodyRadius = 15;
+  context.save();
+  context.fillStyle = '#f97316';
+  context.beginPath();
+  context.arc(x, y, bodyRadius, 0, Math.PI * 2);
+  context.fill();
+  context.strokeStyle = '#7c2d12';
+  context.lineWidth = 2;
+  context.stroke();
+  context.restore();
+
+  if (showHitbox) {
+    context.save();
+    context.strokeStyle = 'rgba(249, 115, 22, 0.8)';
+    context.lineWidth = 2;
+    context.beginPath();
+    context.arc(x, y, arenaRadiusToCanvasRadius(playerHitRadius), 0, Math.PI * 2);
+    context.stroke();
+    context.restore();
+  }
+
+  const maxHp = Math.max(1, Number(monster.max_hp || 1));
+  const hp = Math.max(0, Number(monster.hp || 0));
+  drawRectHealthBar(x, y - 34, 52, 7, hp / maxHp, '#f97316');
+}
+
+function drawSelectedTargetMarker(stateSnapshot) {
+  if (!selectedTargetType || !selectedTargetId) return;
+  let targetX = null;
+  let targetY = null;
+  let radiusArena = playerHitRadius + 1.2;
+
+  if (selectedTargetType === 'player') {
+    const target = findPlayerByUserId(stateSnapshot, selectedTargetId);
+    if (!target || !target.alive) return;
+    targetX = Number(target.x);
+    targetY = Number(target.y);
+  } else if (selectedTargetType === 'monster') {
+    const target = findMonsterById(stateSnapshot, selectedTargetId);
+    if (!target) return;
+    targetX = Number(target.x);
+    targetY = Number(target.y);
+  } else {
+    return;
+  }
+
+  const x = arenaToCanvasX(targetX);
+  const y = arenaToCanvasY(targetY);
+  const markerRadius = arenaRadiusToCanvasRadius(radiusArena);
+  const now = performance.now();
+  const pulse = 0.75 + (0.25 * Math.sin(now / 120));
+
+  context.save();
+  context.strokeStyle = '#f59e0b';
+  context.lineWidth = 2.2;
+  context.globalAlpha = pulse;
+  context.beginPath();
+  context.arc(x, y, markerRadius, 0, Math.PI * 2);
+  context.stroke();
+  context.restore();
 }
 
 function drawPlayer(player) {
@@ -818,7 +995,9 @@ function render() {
     }
     (renderState.obstacles || []).forEach(drawObstacle);
     (renderState.mines || []).forEach(drawMine);
+    (renderState.monsters || []).forEach(drawMonster);
     (renderState.players || []).forEach(drawPlayer);
+    drawSelectedTargetMarker(renderState);
     (renderState.projectiles || []).forEach(drawProjectile);
   }
   drawFloatingTexts();
@@ -900,6 +1079,7 @@ async function connect() {
       const previousSnapshot = worldState;
       worldState = payload;
       if (!renderState) renderState = cloneWorldState(payload);
+      syncSelectedTargetWithState(payload);
       triggerShieldRegenEffects(previousSnapshot, payload);
       updateDeathOverlay();
       updateHud();
@@ -908,13 +1088,25 @@ async function connect() {
 
     if (event === 'open_world_hit') {
       const attackerId = Number(payload.attacker);
+      const attackerKind = String(payload.attacker_kind || 'player');
       const targetId = Number(payload.target);
       const myHit = attackerId === Number(myUserId);
       const shieldBlocked = Boolean(payload.shield_blocked);
       if (shieldBlocked) setPlayerFlash(targetId, '#bfe4ff', 180, 'shield');
       else setPlayerFlash(targetId, myHit ? '#86efac' : '#fca5a5');
-      applyPlayerKnockback(attackerId, targetId);
+      if (attackerKind === 'player') {
+        applyPlayerKnockback(attackerId, targetId);
+      }
       addFloatingTextForPlayer(targetId, shieldBlocked ? 'Block!' : 'Hit!', shieldBlocked ? '#93c5fd' : '#f8fafc');
+      return;
+    }
+
+    if (event === 'open_world_monster_hit') {
+      const x = Number(payload.x);
+      const y = Number(payload.y);
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        addFloatingTextAtArena(x, y, Boolean(payload.destroyed) ? 'Kill!' : 'Hit!', Boolean(payload.destroyed) ? '#ef4444' : '#f8fafc', 850);
+      }
       return;
     }
 
@@ -996,8 +1188,21 @@ canvas.addEventListener('mousemove', (event) => {
 
 canvas.addEventListener('mousedown', (event) => {
   if (event.button !== 0) return;
-  if (isSelfInvulnerable()) return;
   syncPointerFromEvent(event);
+  const clickedTarget = findClickableTargetAtPointer();
+  if (clickedTarget) {
+    setSelectedTarget(clickedTarget.targetType, clickedTarget.targetId);
+  } else {
+    setSelectedTarget(null, null);
+  }
+  if (isSelfInvulnerable()) {
+    scheduleInput();
+    return;
+  }
+  if (!isSelectedTargetAlive()) {
+    scheduleInput();
+    return;
+  }
   pendingShot = true;
   scheduleInput();
 });

@@ -243,6 +243,8 @@ def build_ws_router(
                             payload.aim_y,
                             payload.shoot,
                             payload.drop_mine,
+                            payload.target_type,
+                            payload.target_id,
                         )
                         continue
                     await manager.send_error(websocket, "INVALID_STATE", "jogador sem modo ativo")

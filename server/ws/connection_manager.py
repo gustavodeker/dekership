@@ -222,6 +222,8 @@ class ConnectionManager:
                     "alive": player.alive,
                     "dead_until_tick": player.dead_until_tick,
                     "invulnerable_until_tick": player.invulnerable_until_tick,
+                    "target_kind": player.target_kind,
+                    "target_id": player.target_id,
                 }
                 for player in open_world_state.players.values()
             ],
@@ -229,12 +231,28 @@ class ConnectionManager:
                 {
                     "projectile_id": projectile.projectile_id,
                     "owner_user_id": projectile.owner_user_id,
+                    "owner_kind": projectile.owner_kind,
+                    "owner_entity_id": projectile.owner_entity_id,
+                    "target_kind": projectile.target_kind,
+                    "target_entity_id": projectile.target_entity_id,
                     "x": projectile.x,
                     "y": projectile.y,
                     "velocity_x": projectile.velocity_x,
                     "velocity_y": projectile.velocity_y,
                 }
                 for projectile in open_world_state.projectiles
+            ],
+            "monsters": [
+                {
+                    "monster_id": monster.monster_id,
+                    "x": monster.x,
+                    "y": monster.y,
+                    "aim_x": monster.aim_x,
+                    "aim_y": monster.aim_y,
+                    "hp": monster.hp,
+                    "max_hp": monster.max_hp,
+                }
+                for monster in open_world_state.monsters.values()
             ],
             "mines": [
                 {
@@ -270,9 +288,13 @@ class ConnectionManager:
         target_id: int,
         source: str,
         shield_blocked: bool,
+        attacker_kind: str = "player",
+        attacker_monster_id: int | None = None,
     ) -> None:
         payload = {
             "attacker": attacker_id,
+            "attacker_kind": attacker_kind,
+            "attacker_monster_id": attacker_monster_id,
             "target": target_id,
             "source": source,
             "shield_blocked": shield_blocked,
@@ -320,3 +342,27 @@ class ConnectionManager:
             if websocket is None:
                 continue
             await self.send_json(websocket, "open_world_death", payload)
+
+    async def broadcast_open_world_monster_hit(
+        self,
+        open_world_state,
+        monster_id: int,
+        hp: int,
+        max_hp: int,
+        destroyed: bool,
+        x: float,
+        y: float,
+    ) -> None:
+        payload = {
+            "monster_id": monster_id,
+            "hp": hp,
+            "max_hp": max_hp,
+            "destroyed": destroyed,
+            "x": x,
+            "y": y,
+        }
+        for player in open_world_state.players.values():
+            websocket = self.connections_by_user.get(player.user_id)
+            if websocket is None:
+                continue
+            await self.send_json(websocket, "open_world_monster_hit", payload)

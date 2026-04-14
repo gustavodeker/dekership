@@ -39,6 +39,10 @@ class Projectile:
     velocity_x: float
     velocity_y: float
     speed: float = 1.6
+    owner_kind: str = "player"
+    owner_entity_id: int | None = None
+    target_kind: str | None = None
+    target_entity_id: int | None = None
 
 
 @dataclass(slots=True)
