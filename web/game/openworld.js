@@ -15,8 +15,10 @@ let requestId = 0;
 let inputSeq = 0;
 let myUserId = null;
 let worldState = null;
+let renderState = null;
 let controlsLocked = false;
 let matchTickRate = 20;
+let renderSmoothing = 0.25;
 let mineCooldownTicks = 100;
 let hitsToDie = 3;
 let mineHitsToDestroy = 2;
@@ -225,6 +227,10 @@ function arenaRadiusToCanvasRadius(radius) {
   return Math.min(arenaToCanvasX(radius), arenaToCanvasY(radius));
 }
 
+function lerp(from, to, alpha) {
+  return from + ((to - from) * alpha);
+}
+
 function getSelfPlayer() {
   if (!worldState || !Array.isArray(worldState.players)) return null;
   return worldState.players.find((player) => Number(player.user_id) === Number(myUserId)) || null;
@@ -240,6 +246,63 @@ function isSelfInvulnerable() {
 function findPlayerByUserId(snapshot, userId) {
   if (!snapshot || !Array.isArray(snapshot.players)) return null;
   return snapshot.players.find((player) => Number(player.user_id) === Number(userId)) || null;
+}
+
+function cloneWorldState(snapshot) {
+  return {
+    ...snapshot,
+    players: (snapshot.players || []).map((player) => ({ ...player })),
+    projectiles: (snapshot.projectiles || []).map((projectile) => ({ ...projectile })),
+    mines: (snapshot.mines || []).map((mine) => ({ ...mine })),
+    obstacles: (snapshot.obstacles || []).map((obstacle) => ({ ...obstacle })),
+  };
+}
+
+function blendPlayers(currentPlayers, targetPlayers, alpha) {
+  const currentById = new Map(
+    (currentPlayers || [])
+      .filter((player) => Number.isFinite(Number(player.user_id)))
+      .map((player) => [Number(player.user_id), player])
+  );
+  return (targetPlayers || []).map((target) => {
+    const current = currentById.get(Number(target.user_id));
+    if (!current) return { ...target };
+    return {
+      ...target,
+      x: lerp(Number(current.x), Number(target.x), alpha),
+      y: lerp(Number(current.y), Number(target.y), alpha),
+      aim_x: lerp(Number(current.aim_x), Number(target.aim_x), alpha),
+      aim_y: lerp(Number(current.aim_y), Number(target.aim_y), alpha),
+    };
+  });
+}
+
+function blendProjectiles(currentProjectiles, targetProjectiles, alpha) {
+  const currentById = new Map(
+    (currentProjectiles || [])
+      .filter((projectile) => Number.isFinite(Number(projectile.projectile_id)))
+      .map((projectile) => [Number(projectile.projectile_id), projectile])
+  );
+  return (targetProjectiles || []).map((target) => {
+    const current = currentById.get(Number(target.projectile_id));
+    if (!current) return { ...target };
+    return {
+      ...target,
+      x: lerp(Number(current.x), Number(target.x), alpha),
+      y: lerp(Number(current.y), Number(target.y), alpha),
+    };
+  });
+}
+
+function blendWorldState(current, target, alpha) {
+  if (!current) return cloneWorldState(target);
+  return {
+    ...target,
+    players: blendPlayers(current.players, target.players, alpha),
+    projectiles: blendProjectiles(current.projectiles, target.projectiles, alpha),
+    mines: (target.mines || []).map((mine) => ({ ...mine })),
+    obstacles: (target.obstacles || []).map((obstacle) => ({ ...obstacle })),
+  };
 }
 
 function updateDeathOverlay() {
@@ -749,13 +812,14 @@ function render() {
   context.fillStyle = '#17324f';
   context.fillRect(0, 0, canvas.width, canvas.height);
   if (worldState) {
+    renderState = blendWorldState(renderState, worldState, renderSmoothing);
     for (const mine of (worldState.mines || [])) {
       knownMinePositions.set(Number(mine.mine_id), { x: Number(mine.x), y: Number(mine.y) });
     }
-    (worldState.obstacles || []).forEach(drawObstacle);
-    (worldState.mines || []).forEach(drawMine);
-    (worldState.players || []).forEach(drawPlayer);
-    (worldState.projectiles || []).forEach(drawProjectile);
+    (renderState.obstacles || []).forEach(drawObstacle);
+    (renderState.mines || []).forEach(drawMine);
+    (renderState.players || []).forEach(drawPlayer);
+    (renderState.projectiles || []).forEach(drawProjectile);
   }
   drawFloatingTexts();
   requestAnimationFrame(render);
@@ -796,6 +860,9 @@ async function fetchSession() {
   }
   myUserId = data.user_id;
   if (typeof data.mine_cooldown_ticks === 'number') mineCooldownTicks = Math.max(1, Math.floor(data.mine_cooldown_ticks));
+  if (typeof data.render_smoothing === 'number') {
+    renderSmoothing = Math.max(0, Math.min(1, data.render_smoothing));
+  }
   if (typeof data.hits_to_win === 'number') hitsToDie = Math.max(1, Math.floor(data.hits_to_win));
   if (typeof data.mine_hits_to_destroy === 'number') mineHitsToDestroy = Math.max(1, Math.floor(data.mine_hits_to_destroy));
   if (typeof data.shield_points === 'number') shieldPoints = Math.max(0, Math.floor(data.shield_points));
@@ -832,6 +899,7 @@ async function connect() {
     if (event === 'open_world_state') {
       const previousSnapshot = worldState;
       worldState = payload;
+      if (!renderState) renderState = cloneWorldState(payload);
       triggerShieldRegenEffects(previousSnapshot, payload);
       updateDeathOverlay();
       updateHud();
