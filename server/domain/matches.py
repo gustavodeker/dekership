@@ -23,6 +23,9 @@ class MatchPlayer:
     aim_x: float
     aim_y: float
     hits: int = 0
+    shield_points: int = 2
+    last_damage_tick: int = 0
+    last_shield_regen_tick: int = 0
     last_shot_tick: int = 0
     last_mine_tick: int = -1000000
 

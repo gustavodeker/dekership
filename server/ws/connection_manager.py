@@ -71,6 +71,9 @@ class ConnectionManager:
                 "aim_y": players["bottom"].aim_y,
                 "side": "bottom",
                 "last_mine_tick": players["bottom"].last_mine_tick,
+                "shield_points": players["bottom"].shield_points,
+                "last_damage_tick": players["bottom"].last_damage_tick,
+                "last_shield_regen_tick": players["bottom"].last_shield_regen_tick,
             },
             "p2": {
                 "user_id": players["top"].user_id,
@@ -81,6 +84,9 @@ class ConnectionManager:
                 "aim_y": players["top"].aim_y,
                 "side": "top",
                 "last_mine_tick": players["top"].last_mine_tick,
+                "shield_points": players["top"].shield_points,
+                "last_damage_tick": players["top"].last_damage_tick,
+                "last_shield_regen_tick": players["top"].last_shield_regen_tick,
             },
             "projectiles": [
                 {

@@ -41,13 +41,15 @@ $mineHitboxRadius = 2.4;
 $mineCooldownTicks = 100;
 $hitsToWin = 3;
 $mineHitsToDestroy = 2;
+$shieldPoints = 2;
+$shieldRegenSeconds = 10;
 $showHitbox = true;
 $wsMode = 'vps';
 try {
     $settingStmt = db()->prepare(
         "SELECT setting_key, setting_value
          FROM game_settings
-         WHERE setting_key IN ('render_smoothing', 'player_hitbox_radius', 'projectile_hitbox_radius', 'mine_hitbox_radius', 'mine_cooldown_ticks', 'hits_to_win', 'mine_hits_to_destroy', 'show_hitbox', 'ws_mode')"
+         WHERE setting_key IN ('render_smoothing', 'player_hitbox_radius', 'projectile_hitbox_radius', 'mine_hitbox_radius', 'mine_cooldown_ticks', 'hits_to_win', 'mine_hits_to_destroy', 'shield_points', 'shield_regen_seconds', 'show_hitbox', 'ws_mode')"
     );
     $settingStmt->execute();
     $settings = $settingStmt->fetchAll(PDO::FETCH_KEY_PAIR);
@@ -72,6 +74,12 @@ try {
     if (isset($settings['mine_hits_to_destroy'])) {
         $mineHitsToDestroy = (int) (float) $settings['mine_hits_to_destroy'];
     }
+    if (isset($settings['shield_points'])) {
+        $shieldPoints = (int) (float) $settings['shield_points'];
+    }
+    if (isset($settings['shield_regen_seconds'])) {
+        $shieldRegenSeconds = (int) (float) $settings['shield_regen_seconds'];
+    }
     if (isset($settings['show_hitbox'])) {
         $showHitbox = (string) $settings['show_hitbox'] !== '0';
     }
@@ -89,6 +97,8 @@ try {
     $mineCooldownTicks = 100;
     $hitsToWin = 3;
     $mineHitsToDestroy = 2;
+    $shieldPoints = 2;
+    $shieldRegenSeconds = 10;
     $showHitbox = true;
     $wsMode = 'vps';
 }
@@ -99,6 +109,8 @@ $mineHitboxRadius = max(0.1, $mineHitboxRadius);
 $mineCooldownTicks = max(1, $mineCooldownTicks);
 $hitsToWin = max(1, $hitsToWin);
 $mineHitsToDestroy = max(1, $mineHitsToDestroy);
+$shieldPoints = max(0, $shieldPoints);
+$shieldRegenSeconds = max(1, $shieldRegenSeconds);
 $configData = app_config();
 $wsUrl = $wsMode === 'local'
     ? (string) $configData['ws_url_local']
@@ -117,6 +129,8 @@ echo json_encode([
     'mine_cooldown_ticks' => $mineCooldownTicks,
     'hits_to_win' => $hitsToWin,
     'mine_hits_to_destroy' => $mineHitsToDestroy,
+    'shield_points' => $shieldPoints,
+    'shield_regen_seconds' => $shieldRegenSeconds,
     'show_hitbox' => $showHitbox,
     'ws_mode' => $wsMode,
     'ws_url' => $wsUrl,

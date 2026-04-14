@@ -52,6 +52,8 @@ class GameConfigService:
                       ('projectile_hitbox_radius', '0.6'),
                       ('mine_hitbox_radius', '2.4'),
                       ('mine_hits_to_destroy', '2'),
+                      ('shield_points', '2'),
+                      ('shield_regen_seconds', '10'),
                       ('show_hitbox', '1')
                     ON DUPLICATE KEY UPDATE setting_value = setting_value
                     """
@@ -85,4 +87,6 @@ class GameConfigService:
             "projectile_hitbox_radius": float(self._cache.get("projectile_hitbox_radius", "0.6")),
             "mine_hitbox_radius": float(self._cache.get("mine_hitbox_radius", "2.4")),
             "mine_hits_to_destroy": max(1, int(float(self._cache.get("mine_hits_to_destroy", "2")))),
+            "shield_points": max(0, int(float(self._cache.get("shield_points", "2")))),
+            "shield_regen_seconds": max(1, int(float(self._cache.get("shield_regen_seconds", "10")))),
         }

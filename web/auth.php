@@ -127,6 +127,8 @@ function ensure_admin_schema(): void
         ('projectile_hitbox_radius', '0.6'),
         ('mine_hitbox_radius', '2.4'),
         ('mine_hits_to_destroy', '2'),
+        ('shield_points', '2'),
+        ('shield_regen_seconds', '10'),
         ('show_hitbox', '1')
         ON DUPLICATE KEY UPDATE setting_value = setting_value"
     );

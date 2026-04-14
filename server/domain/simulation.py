@@ -63,6 +63,7 @@ class SimulationService:
                             seconds=settings.reconnect_timeout_seconds
                         )
                     else:
+                        await self._apply_shield_regen(match)
                         await self._apply_inputs(room, match)
                         await self._advance_mines(room, match)
                         await self._advance_projectiles(room, match)
@@ -76,6 +77,9 @@ class SimulationService:
         movement_speed = game_settings["movement_speed"]
         fire_cooldown_ticks = max(1, int(game_settings["fire_cooldown_ticks"]))
         mine_cooldown_ticks = max(1, int(game_settings["mine_cooldown_ticks"]))
+        shield_points_max = max(0, int(game_settings["shield_points"]))
+        for match_player in match.players.values():
+            self._sync_shield_state_for_match(match_player, shield_points_max, match.tick)
         for player_state in room.players.values():
             match_player = match.players[player_state.user_id]
             input_x = float(player_state.move_x)
@@ -140,6 +144,7 @@ class SimulationService:
     async def _advance_mines(self, room, match: MatchState) -> None:
         game_settings = await self.game_config.get_settings()
         hits_to_win = max(1, int(game_settings["hits_to_win"]))
+        shield_points_max = max(0, int(game_settings["shield_points"]))
         player_hitbox_radius = game_settings["player_hitbox_radius"]
         mine_hitbox_radius = game_settings["mine_hitbox_radius"]
         hit_distance = player_hitbox_radius + mine_hitbox_radius
@@ -154,7 +159,9 @@ class SimulationService:
             target = next(player for player in match.players.values() if player.user_id != mine.owner_user_id)
             if self._visual_distance(mine.x, mine.y, target.x, target.y) <= hit_distance:
                 attacker = match.players[mine.owner_user_id]
-                attacker.hits += 1
+                life_damage_applied = self._apply_hit_damage(target, shield_points_max, match.tick)
+                if life_damage_applied:
+                    attacker.hits += 1
                 await self.connection_manager.broadcast_hit(
                     room,
                     match,
@@ -162,7 +169,7 @@ class SimulationService:
                     target.user_id,
                     "mine",
                 )
-                if attacker.hits >= hits_to_win:
+                if life_damage_applied and attacker.hits >= hits_to_win:
                     await self._finish(match, attacker.user_id, target.user_id, "3_hits")
                     return
                 continue
@@ -173,6 +180,7 @@ class SimulationService:
         game_settings = await self.game_config.get_settings()
         hits_to_win = max(1, int(game_settings["hits_to_win"]))
         mine_hits_to_destroy = max(1, int(game_settings["mine_hits_to_destroy"]))
+        shield_points_max = max(0, int(game_settings["shield_points"]))
         player_hitbox_radius = game_settings["player_hitbox_radius"]
         projectile_hitbox_radius = game_settings["projectile_hitbox_radius"]
         mine_hitbox_radius = game_settings["mine_hitbox_radius"]
@@ -223,7 +231,9 @@ class SimulationService:
             target = next(player for player in match.players.values() if player.user_id != projectile.owner_user_id)
             if self._visual_distance(projectile.x, projectile.y, target.x, target.y) <= hit_distance:
                 attacker = match.players[projectile.owner_user_id]
-                attacker.hits += 1
+                life_damage_applied = self._apply_hit_damage(target, shield_points_max, match.tick)
+                if life_damage_applied:
+                    attacker.hits += 1
                 await self.connection_manager.broadcast_hit(
                     room,
                     match,
@@ -231,12 +241,49 @@ class SimulationService:
                     target.user_id,
                     "projectile",
                 )
-                if attacker.hits >= hits_to_win:
+                if life_damage_applied and attacker.hits >= hits_to_win:
                     await self._finish(match, attacker.user_id, target.user_id, "3_hits")
                     return
                 continue
             active.append(projectile)
         match.projectiles = active
+
+    async def _apply_shield_regen(self, match: MatchState) -> None:
+        game_settings = await self.game_config.get_settings()
+        shield_points_max = max(0, int(game_settings["shield_points"]))
+        shield_regen_ticks = max(1, int(game_settings["shield_regen_seconds"]) * settings.ws_tick_rate)
+        for player in match.players.values():
+            self._sync_shield_state_for_match(player, shield_points_max, match.tick)
+            if player.shield_points >= shield_points_max:
+                continue
+            ticks_since_damage = max(0, match.tick - player.last_damage_tick)
+            if ticks_since_damage < shield_regen_ticks:
+                continue
+            regen_cycles = (ticks_since_damage - shield_regen_ticks) // shield_regen_ticks
+            regen_tick = player.last_damage_tick + shield_regen_ticks + (regen_cycles * shield_regen_ticks)
+            if regen_tick <= player.last_shield_regen_tick:
+                continue
+            player.shield_points = min(shield_points_max, player.shield_points + 1)
+            player.last_shield_regen_tick = regen_tick
+
+    @staticmethod
+    def _sync_shield_state_for_match(player, shield_points_max: int, current_tick: int) -> None:
+        if shield_points_max <= 0:
+            player.shield_points = 0
+            player.last_shield_regen_tick = current_tick
+            return
+        player.shield_points = max(0, min(shield_points_max, int(player.shield_points)))
+        player.last_damage_tick = max(0, int(player.last_damage_tick))
+        player.last_shield_regen_tick = max(player.last_damage_tick, int(player.last_shield_regen_tick))
+
+    @staticmethod
+    def _apply_hit_damage(target, shield_points_max: int, current_tick: int) -> bool:
+        target.last_damage_tick = current_tick
+        target.last_shield_regen_tick = current_tick
+        if shield_points_max > 0 and target.shield_points > 0:
+            target.shield_points = max(0, target.shield_points - 1)
+            return False
+        return True
 
     @staticmethod
     def _collides_with_obstacle(x: float, y: float, radius: float, match: MatchState) -> bool:

@@ -22,6 +22,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $projectileHitboxRadius = (float) ($_POST['projectile_hitbox_radius'] ?? 0.6);
             $mineHitboxRadius = (float) ($_POST['mine_hitbox_radius'] ?? 2.4);
             $mineHitsToDestroy = (int) ($_POST['mine_hits_to_destroy'] ?? 2);
+            $shieldPoints = (int) ($_POST['shield_points'] ?? 2);
+            $shieldRegenSeconds = (int) ($_POST['shield_regen_seconds'] ?? 10);
             $showHitbox = isset($_POST['show_hitbox']) ? 1 : 0;
 
             if (
@@ -37,6 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 || $projectileHitboxRadius <= 0
                 || $mineHitboxRadius <= 0
                 || $mineHitsToDestroy <= 0
+                || $shieldPoints < 0
+                || $shieldRegenSeconds <= 0
             ) {
                 throw new RuntimeException('Valores invalidos');
             }
@@ -57,6 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute(['setting_key' => 'projectile_hitbox_radius', 'setting_value' => (string) $projectileHitboxRadius]);
             $stmt->execute(['setting_key' => 'mine_hitbox_radius', 'setting_value' => (string) $mineHitboxRadius]);
             $stmt->execute(['setting_key' => 'mine_hits_to_destroy', 'setting_value' => (string) $mineHitsToDestroy]);
+            $stmt->execute(['setting_key' => 'shield_points', 'setting_value' => (string) $shieldPoints]);
+            $stmt->execute(['setting_key' => 'shield_regen_seconds', 'setting_value' => (string) $shieldRegenSeconds]);
             $stmt->execute(['setting_key' => 'show_hitbox', 'setting_value' => (string) $showHitbox]);
             $success = 'Configuracoes salvas';
         }
@@ -170,6 +176,14 @@ render_header('Configuracoes');
             <label>
                 <span>Hits para destruir mina</span>
                 <input type="number" step="1" min="1" name="mine_hits_to_destroy" value="<?= htmlspecialchars((string) ($settings['mine_hits_to_destroy'] ?? '2'), ENT_QUOTES, 'UTF-8') ?>" required>
+            </label>
+            <label>
+                <span>Pontos de escudo</span>
+                <input type="number" step="1" min="0" name="shield_points" value="<?= htmlspecialchars((string) ($settings['shield_points'] ?? '2'), ENT_QUOTES, 'UTF-8') ?>" required>
+            </label>
+            <label>
+                <span>Tempo para regenerar 1 escudo (segundos)</span>
+                <input type="number" step="1" min="1" name="shield_regen_seconds" value="<?= htmlspecialchars((string) ($settings['shield_regen_seconds'] ?? '10'), ENT_QUOTES, 'UTF-8') ?>" required>
             </label>
             <label>
                 <span>Mostrar linha de hitbox</span>

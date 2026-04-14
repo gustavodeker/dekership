@@ -5,6 +5,7 @@ const scoreSelf = document.getElementById('score-self');
 const scoreOpponent = document.getElementById('score-opponent');
 const startOverlayNode = document.getElementById('game-start-overlay');
 const mineCooldownValueNode = document.getElementById('mine-cooldown-value');
+const shieldRegenValueNode = document.getElementById('shield-regen-value');
 const DESIGN_WIDTH = canvas.width;
 const DESIGN_HEIGHT = canvas.height;
 
@@ -34,6 +35,8 @@ let mineCooldownTicks = 100;
 let matchTickRate = 20;
 let hitsToWin = 3;
 let mineHitsToDestroy = 2;
+let shieldPoints = 2;
+let shieldRegenSeconds = 10;
 let showHitbox = true;
 let hitFeedbackUntil = 0;
 let hitFeedbackColor = '#22c55e';
@@ -48,6 +51,8 @@ const playerKnockbackEffects = new Map();
 const mineFlashEffects = new Map();
 const shipSprite = new Image();
 let shipSpriteReady = false;
+const shieldSprite = new Image();
+let shieldSpriteReady = false;
 const SHIP_RENDER_WIDTH = 156;
 const SHIP_RENDER_HEIGHT = 156;
 const SHIP_SPRITE_FRAME_SIZE = 512;
@@ -57,6 +62,14 @@ const SHIP_SPRITE_FRAME_COUNT = SHIP_SPRITE_GRID_COLS * SHIP_SPRITE_GRID_ROWS;
 const SHIP_SPRITE_ANGLE_OFFSET = 0;
 const SHIP_SPRITE_REVERSE_WINDING = true;
 const SHIP_SPRITE_ANGLE_STEP = (Math.PI * 2) / SHIP_SPRITE_FRAME_COUNT;
+const SHIELD_RENDER_WIDTH = 188;
+const SHIELD_RENDER_HEIGHT = 188;
+const SHIELD_ANIMATION_FPS = 20;
+const shieldAtlas = {
+  frameWidth: 512,
+  frameHeight: 512,
+  frames: [],
+};
 
 shipSprite.addEventListener('load', () => {
   shipSpriteReady = true;
@@ -66,9 +79,77 @@ shipSprite.addEventListener('error', () => {
   shipSpriteReady = false;
 });
 
+shieldSprite.addEventListener('load', () => {
+  shieldSpriteReady = true;
+});
+
+shieldSprite.addEventListener('error', () => {
+  shieldSpriteReady = false;
+});
+
 shipSprite.src = '/web/assets/spritesheet_9x9_512.png';
+shieldSprite.src = '/web/assets/spritesheetshild.png';
+loadShieldAtlas();
 if (mineCooldownValueNode) {
   mineCooldownValueNode.textContent = 'READY';
+}
+if (shieldRegenValueNode) {
+  shieldRegenValueNode.textContent = 'READY';
+}
+
+async function loadShieldAtlas() {
+  try {
+    const response = await fetch('/web/assets/shild.atlas.txt', { cache: 'no-store' });
+    if (!response.ok) return;
+    const atlasText = await response.text();
+    parseShieldAtlas(atlasText);
+  } catch (error) {
+    // Atlas opcional; animação é ignorada se indisponível.
+  }
+}
+
+function parseShieldAtlas(text) {
+  const lines = String(text || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const framesByIndex = new Map();
+  for (const line of lines) {
+    const separatorIndex = line.indexOf('=');
+    if (separatorIndex <= 0) continue;
+    const key = line.slice(0, separatorIndex).trim();
+    const value = line.slice(separatorIndex + 1).trim();
+
+    if (key === 'frame') {
+      const [width, height] = value.split(',').map(Number);
+      if (Number.isFinite(width) && width > 0) shieldAtlas.frameWidth = width;
+      if (Number.isFinite(height) && height > 0) shieldAtlas.frameHeight = height;
+      continue;
+    }
+
+    if (!key.startsWith('frame_')) continue;
+    const match = key.match(/^frame_(\d+)$/);
+    if (!match) continue;
+    const [sx, sy, sw, sh] = value.split(',').map(Number);
+    if (![sx, sy, sw, sh].every(Number.isFinite)) continue;
+    framesByIndex.set(Number(match[1]), { sx, sy, sw, sh });
+  }
+
+  const ordered = Array.from(framesByIndex.keys())
+    .sort((a, b) => a - b)
+    .map((index) => framesByIndex.get(index))
+    .filter(Boolean);
+
+  if (ordered.length > 0) {
+    shieldAtlas.frames = ordered;
+  }
+}
+
+function getShieldFrame(now = performance.now()) {
+  if (!shieldAtlas.frames.length) return null;
+  const frameIndex = Math.floor((now / 1000) * SHIELD_ANIMATION_FPS) % shieldAtlas.frames.length;
+  return shieldAtlas.frames[frameIndex];
 }
 
 function normalizeAngleRad(angle) {
@@ -249,6 +330,12 @@ async function fetchSession() {
   if (typeof data.mine_hits_to_destroy === 'number') {
     mineHitsToDestroy = Math.max(1, Math.floor(data.mine_hits_to_destroy));
   }
+  if (typeof data.shield_points === 'number') {
+    shieldPoints = Math.max(0, Math.floor(data.shield_points));
+  }
+  if (typeof data.shield_regen_seconds === 'number') {
+    shieldRegenSeconds = Math.max(1, Math.floor(data.shield_regen_seconds));
+  }
   if (typeof data.show_hitbox === 'boolean') {
     showHitbox = data.show_hitbox;
   }
@@ -411,6 +498,32 @@ function updateMineCooldownUi(snapshot) {
   mineCooldownValueNode.textContent = remaining <= 0 ? 'READY' : `${remaining.toFixed(1)}s`;
 }
 
+function shieldRegenRemainingSeconds(snapshot) {
+  if (!snapshot || !myUserId || shieldPoints <= 0) return 0;
+  const selfPlayer = Number(snapshot.p1?.user_id) === Number(myUserId) ? snapshot.p1 : snapshot.p2;
+  if (!selfPlayer) return 0;
+  const currentShield = Math.max(0, Math.floor(Number(selfPlayer.shield_points ?? 0)));
+  if (currentShield >= shieldPoints) return 0;
+  const tick = Number(snapshot.tick ?? 0);
+  const lastDamageTick = Math.max(0, Math.floor(Number(selfPlayer.last_damage_tick ?? tick)));
+  const lastRegenTick = Math.max(lastDamageTick, Math.floor(Number(selfPlayer.last_shield_regen_tick ?? lastDamageTick)));
+  const baseTick = Math.max(lastDamageTick, lastRegenTick);
+  const regenTicks = Math.max(1, Math.floor(shieldRegenSeconds * Math.max(1, matchTickRate)));
+  const elapsedTicks = Math.max(0, tick - baseTick);
+  const remainingTicks = Math.max(0, regenTicks - elapsedTicks);
+  return remainingTicks / Math.max(1, matchTickRate);
+}
+
+function updateShieldRegenUi(snapshot) {
+  if (!shieldRegenValueNode) return;
+  if (shieldPoints <= 0) {
+    shieldRegenValueNode.textContent = 'OFF';
+    return;
+  }
+  const remaining = shieldRegenRemainingSeconds(snapshot);
+  shieldRegenValueNode.textContent = remaining <= 0 ? 'READY' : `${remaining.toFixed(1)}s`;
+}
+
 function isMineHotkey(event) {
   if (!event) return false;
   return event.code === 'Digit1' || event.code === 'Numpad1' || event.key === '1' || event.key === 'End';
@@ -430,7 +543,7 @@ function drawRectHealthBar(centerX, topY, width, height, ratio, fillColor) {
   context.restore();
 }
 
-function drawPlayer(player, color, lifeRatio = 1) {
+function drawPlayer(player, color, lifeRatio = 1, shieldRatio = 1) {
   const flash = getPlayerFlash(player.user_id);
   const knockback = getPlayerKnockbackOffset(player.user_id);
   const x = arenaToCanvasX(player.x) + knockback.x;
@@ -477,6 +590,23 @@ function drawPlayer(player, color, lifeRatio = 1) {
     context.fill();
   }
 
+  if (shieldSpriteReady && Number(player.shield_points ?? 0) > 0) {
+    const shieldFrame = getShieldFrame();
+    if (shieldFrame) {
+      context.drawImage(
+        shieldSprite,
+        shieldFrame.sx,
+        shieldFrame.sy,
+        shieldFrame.sw,
+        shieldFrame.sh,
+        -SHIELD_RENDER_WIDTH / 2,
+        -SHIELD_RENDER_HEIGHT / 2,
+        SHIELD_RENDER_WIDTH,
+        SHIELD_RENDER_HEIGHT
+      );
+    }
+  }
+
   context.restore();
 
   if (showHitbox) {
@@ -502,6 +632,7 @@ function drawPlayer(player, color, lifeRatio = 1) {
     context.restore();
   }
 
+  drawRectHealthBar(x, y - 67, 56, 7, shieldRatio, '#60a5fa');
   drawRectHealthBar(x, y - 57, 56, 7, lifeRatio, '#22c55e');
 }
 
@@ -748,13 +879,16 @@ function render() {
     const p2DamageTaken = Number(state.score?.p1 || 0);
     const p1LifeRatio = (hitsToWin - p1DamageTaken) / hitsToWin;
     const p2LifeRatio = (hitsToWin - p2DamageTaken) / hitsToWin;
-    drawPlayer(renderState.p1, renderState.p1.user_id === myUserId ? '#22c55e' : '#3b82f6', p1LifeRatio);
-    drawPlayer(renderState.p2, renderState.p2.user_id === myUserId ? '#22c55e' : '#ef4444', p2LifeRatio);
+    const p1ShieldRatio = shieldPoints > 0 ? Number(state.p1?.shield_points ?? 0) / shieldPoints : 0;
+    const p2ShieldRatio = shieldPoints > 0 ? Number(state.p2?.shield_points ?? 0) / shieldPoints : 0;
+    drawPlayer(renderState.p1, renderState.p1.user_id === myUserId ? '#22c55e' : '#3b82f6', p1LifeRatio, p1ShieldRatio);
+    drawPlayer(renderState.p2, renderState.p2.user_id === myUserId ? '#22c55e' : '#ef4444', p2LifeRatio, p2ShieldRatio);
     renderState.projectiles.forEach(drawProjectile);
     const selfIsBottom = state.p1.user_id === myUserId;
     scoreSelf.textContent = selfIsBottom ? state.score.p1 : state.score.p2;
     scoreOpponent.textContent = selfIsBottom ? state.score.p2 : state.score.p1;
     updateMineCooldownUi(state);
+    updateShieldRegenUi(state);
   }
   drawHitFeedback();
   drawFps();
