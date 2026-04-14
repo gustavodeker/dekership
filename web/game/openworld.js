@@ -37,6 +37,8 @@ let pendingShot = false;
 let pendingMine = false;
 let selectedTargetType = null;
 let selectedTargetId = null;
+let autoFireEnabled = false;
+let autoFireTimer = null;
 const floatingTexts = [];
 const knownMinePositions = new Map();
 
@@ -175,7 +177,8 @@ function currentMoveY() {
 
 function sendInput(shoot = false, dropMine = false) {
   if (controlsLocked) return;
-  const safeShoot = isSelfInvulnerable() ? false : shoot;
+  const canAutoShoot = autoFireEnabled && isSelectedTargetAlive();
+  const safeShoot = isSelfInvulnerable() ? false : (shoot || canAutoShoot);
   send('player_input', {
     seq: ++inputSeq,
     move_x: currentMoveX(),
@@ -187,6 +190,31 @@ function sendInput(shoot = false, dropMine = false) {
     target_type: selectedTargetType,
     target_id: selectedTargetId,
   });
+}
+
+function setAutoFire(enabled) {
+  const nextEnabled = Boolean(enabled);
+  if (!nextEnabled) {
+    autoFireEnabled = false;
+    if (autoFireTimer) {
+      clearInterval(autoFireTimer);
+      autoFireTimer = null;
+    }
+    return;
+  }
+  if (!isSelectedTargetAlive()) return;
+  autoFireEnabled = true;
+  if (!autoFireTimer) {
+    autoFireTimer = window.setInterval(() => {
+      if (!autoFireEnabled) return;
+      if (!isSelectedTargetAlive()) {
+        setAutoFire(false);
+        return;
+      }
+      scheduleInput();
+    }, 33);
+  }
+  scheduleInput();
 }
 
 function scheduleInput() {
@@ -261,12 +289,14 @@ function setSelectedTarget(targetType, targetId) {
   if (targetType !== 'player' && targetType !== 'monster') {
     selectedTargetType = null;
     selectedTargetId = null;
+    setAutoFire(false);
     return;
   }
   const normalizedTargetId = Number(targetId);
   if (!Number.isFinite(normalizedTargetId) || normalizedTargetId <= 0) {
     selectedTargetType = null;
     selectedTargetId = null;
+    setAutoFire(false);
     return;
   }
   selectedTargetType = targetType;
@@ -422,6 +452,7 @@ function updateDeathOverlay() {
     return;
   }
   controlsLocked = true;
+  setAutoFire(false);
   deathOverlayNode.hidden = false;
   const remainingTicks = Math.max(0, Number(selfPlayer.dead_until_tick || 0) - Number(worldState.tick || 0));
   const remainingSeconds = Math.ceil(remainingTicks / Math.max(1, matchTickRate));
@@ -762,7 +793,7 @@ function drawSelectedTargetMarker(stateSnapshot) {
   const pulse = 0.75 + (0.25 * Math.sin(now / 120));
 
   context.save();
-  context.strokeStyle = '#f59e0b';
+  context.strokeStyle = autoFireEnabled ? '#ef4444' : '#cbd5e1';
   context.lineWidth = 2.2;
   context.globalAlpha = pulse;
   context.beginPath();
@@ -1170,6 +1201,11 @@ window.addEventListener('keydown', (event) => {
     pendingMine = false;
     send('drop_mine');
   }
+  if ((event.key === 'Control' || event.code === 'ControlLeft' || event.code === 'ControlRight') && !event.repeat) {
+    event.preventDefault();
+    if (autoFireEnabled) setAutoFire(false);
+    else if (isSelectedTargetAlive()) setAutoFire(true);
+  }
   scheduleInput();
 });
 
@@ -1199,12 +1235,19 @@ canvas.addEventListener('mousedown', (event) => {
     scheduleInput();
     return;
   }
-  if (!isSelectedTargetAlive()) {
-    scheduleInput();
+  scheduleInput();
+});
+
+canvas.addEventListener('dblclick', (event) => {
+  if (event.button !== 0) return;
+  syncPointerFromEvent(event);
+  const clickedTarget = findClickableTargetAtPointer();
+  if (!clickedTarget) {
+    setSelectedTarget(null, null);
     return;
   }
-  pendingShot = true;
-  scheduleInput();
+  setSelectedTarget(clickedTarget.targetType, clickedTarget.targetId);
+  if (isSelectedTargetAlive()) setAutoFire(true);
 });
 
 respawnButton.addEventListener('click', () => {
