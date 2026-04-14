@@ -19,7 +19,7 @@ class PlayerInputPayload(BaseModel):
     aim_y: float = Field(ge=0, le=100)
     shoot: bool = False
     drop_mine: bool = False
-    target_type: str | None = Field(default=None, pattern="^(player|monster)$")
+    target_type: str | None = Field(default=None, pattern="^(player|monster|mine)$")
     target_id: int | None = Field(default=None, ge=1)
 
 

@@ -285,8 +285,13 @@ function findMonsterById(snapshot, monsterId) {
   return snapshot.monsters.find((monster) => Number(monster.monster_id) === Number(monsterId)) || null;
 }
 
+function findMineById(snapshot, mineId) {
+  if (!snapshot || !Array.isArray(snapshot.mines)) return null;
+  return snapshot.mines.find((mine) => Number(mine.mine_id) === Number(mineId)) || null;
+}
+
 function setSelectedTarget(targetType, targetId) {
-  if (targetType !== 'player' && targetType !== 'monster') {
+  if (targetType !== 'player' && targetType !== 'monster' && targetType !== 'mine') {
     selectedTargetType = null;
     selectedTargetId = null;
     setAutoFire(false);
@@ -312,6 +317,10 @@ function isSelectedTargetAlive(snapshot = worldState) {
   if (selectedTargetType === 'monster') {
     return Boolean(findMonsterById(snapshot, selectedTargetId));
   }
+  if (selectedTargetType === 'mine') {
+    const mine = findMineById(snapshot, selectedTargetId);
+    return Boolean(mine && Number(mine.owner_user_id) !== Number(myUserId));
+  }
   return false;
 }
 
@@ -323,7 +332,7 @@ function syncSelectedTargetWithState(snapshot) {
   }
   const targetKind = String(selfPlayer.target_kind || '');
   const targetId = Number(selfPlayer.target_id);
-  if ((targetKind === 'player' || targetKind === 'monster') && Number.isFinite(targetId) && targetId > 0) {
+  if ((targetKind === 'player' || targetKind === 'monster' || targetKind === 'mine') && Number.isFinite(targetId) && targetId > 0) {
     setSelectedTarget(targetKind, targetId);
     return;
   }
@@ -362,7 +371,23 @@ function findClickableTargetAtPointer() {
       best = { targetType: 'monster', targetId: Number(monster.monster_id), distance };
     }
   }
+
+  for (const mine of (worldState.mines || [])) {
+    if (Number(mine.owner_user_id) === Number(myUserId)) continue;
+    const distance = visualDistance(baseX, baseY, mine.x, mine.y);
+    const hitDistance = Math.max(1.8, mineHitRadius + 0.8);
+    if (distance > hitDistance) continue;
+    if (!best || distance < best.distance) {
+      best = { targetType: 'mine', targetId: Number(mine.mine_id), distance };
+    }
+  }
   return best;
+}
+
+function updateCanvasCursor() {
+  if (!canvas) return;
+  const hasClickable = Boolean(findClickableTargetAtPointer());
+  canvas.style.cursor = hasClickable ? 'pointer' : 'default';
 }
 
 function cloneWorldState(snapshot) {
@@ -782,6 +807,12 @@ function drawSelectedTargetMarker(stateSnapshot) {
     if (!target) return;
     targetX = Number(target.x);
     targetY = Number(target.y);
+  } else if (selectedTargetType === 'mine') {
+    const target = findMineById(stateSnapshot, selectedTargetId);
+    if (!target) return;
+    targetX = Number(target.x);
+    targetY = Number(target.y);
+    radiusArena = mineHitRadius + 1.0;
   } else {
     return;
   }
@@ -1111,6 +1142,7 @@ async function connect() {
       worldState = payload;
       if (!renderState) renderState = cloneWorldState(payload);
       syncSelectedTargetWithState(payload);
+      updateCanvasCursor();
       triggerShieldRegenEffects(previousSnapshot, payload);
       updateDeathOverlay();
       updateHud();
@@ -1219,6 +1251,7 @@ window.addEventListener('keyup', (event) => {
 
 canvas.addEventListener('mousemove', (event) => {
   syncPointerFromEvent(event);
+  updateCanvasCursor();
   scheduleInput();
 });
 

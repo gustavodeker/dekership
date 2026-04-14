@@ -190,7 +190,7 @@ class OpenWorldService:
             if target_type is None or target_id is None:
                 player.target_kind = None
                 player.target_id = None
-            elif target_type in {"player", "monster"}:
+            elif target_type in {"player", "monster", "mine"}:
                 player.target_kind = target_type
                 player.target_id = int(target_id)
             else:
@@ -491,7 +491,7 @@ class OpenWorldService:
 
         active: list[Projectile] = []
         for projectile in self.state.projectiles:
-            if projectile.owner_kind == "player" and projectile.target_kind in {"player", "monster"}:
+            if projectile.owner_kind == "player" and projectile.target_kind in {"player", "monster", "mine"}:
                 target_position = self._resolve_projectile_target(projectile)
                 if target_position is None:
                     continue
@@ -512,11 +512,13 @@ class OpenWorldService:
                 continue
 
             if projectile.owner_kind == "player":
+                expected_mine_id = projectile.target_entity_id if projectile.target_kind == "mine" else None
                 enemy_mine_hit = next(
                     (
                         mine
                         for mine in self.state.mines
                         if mine.owner_user_id != projectile.owner_user_id
+                        and (expected_mine_id is None or mine.mine_id == expected_mine_id)
                         and self._segment_hits_circle_visual(
                             previous_x,
                             previous_y,
@@ -545,55 +547,59 @@ class OpenWorldService:
                     )
                     continue
 
-                hit_monster = self._find_hit_monster(
-                    projectile.x,
-                    projectile.y,
-                    monster_hit_distance,
-                    expected_monster_id=projectile.target_entity_id if projectile.target_kind == "monster" else None,
-                )
-                if hit_monster is not None:
-                    hit_monster.hp = max(0, hit_monster.hp - 1)
-                    destroyed = hit_monster.hp <= 0
-                    await self.connection_manager.broadcast_open_world_monster_hit(
-                        self.state,
-                        monster_id=hit_monster.monster_id,
-                        hp=hit_monster.hp,
-                        max_hp=hit_monster.max_hp,
-                        destroyed=destroyed,
-                        x=hit_monster.x,
-                        y=hit_monster.y,
+                if projectile.target_kind != "mine":
+                    hit_monster = self._find_hit_monster(
+                        projectile.x,
+                        projectile.y,
+                        monster_hit_distance,
+                        expected_monster_id=projectile.target_entity_id if projectile.target_kind == "monster" else None,
                     )
-                    if destroyed:
-                        self.state.monsters.pop(hit_monster.monster_id, None)
-                        self.state.pending_monster_respawns.append(self.state.tick + monster_respawn_ticks)
-                    continue
+                    if hit_monster is not None:
+                        hit_monster.hp = max(0, hit_monster.hp - 1)
+                        destroyed = hit_monster.hp <= 0
+                        await self.connection_manager.broadcast_open_world_monster_hit(
+                            self.state,
+                            monster_id=hit_monster.monster_id,
+                            hp=hit_monster.hp,
+                            max_hp=hit_monster.max_hp,
+                            destroyed=destroyed,
+                            x=hit_monster.x,
+                            y=hit_monster.y,
+                        )
+                        if destroyed:
+                            self.state.monsters.pop(hit_monster.monster_id, None)
+                            self.state.pending_monster_respawns.append(self.state.tick + monster_respawn_ticks)
+                        continue
 
-                target = self._find_target_player(
-                    projectile.x,
-                    projectile.y,
-                    hit_distance,
-                    owner_user_id=projectile.owner_user_id,
-                    expected_target_id=projectile.target_entity_id if projectile.target_kind == "player" else None,
-                )
-                if target is None:
-                    active.append(projectile)
-                    continue
+                if projectile.target_kind != "mine":
+                    target = self._find_target_player(
+                        projectile.x,
+                        projectile.y,
+                        hit_distance,
+                        owner_user_id=projectile.owner_user_id,
+                        expected_target_id=projectile.target_entity_id if projectile.target_kind == "player" else None,
+                    )
+                    if target is None:
+                        active.append(projectile)
+                        continue
 
-                attacker = self.state.players.get(projectile.owner_user_id)
-                if attacker is None:
+                    attacker = self.state.players.get(projectile.owner_user_id)
+                    if attacker is None:
+                        continue
+                    life_damage_applied = self._apply_hit_damage(target, shield_points_max, self.state.tick)
+                    await self.connection_manager.broadcast_open_world_hit(
+                        self.state,
+                        attacker_id=attacker.user_id,
+                        target_id=target.user_id,
+                        source="projectile",
+                        shield_blocked=not life_damage_applied,
+                        attacker_kind="player",
+                        attacker_monster_id=None,
+                    )
+                    if life_damage_applied and target.damage_taken >= hits_to_win:
+                        await self._kill_player(attacker, target)
                     continue
-                life_damage_applied = self._apply_hit_damage(target, shield_points_max, self.state.tick)
-                await self.connection_manager.broadcast_open_world_hit(
-                    self.state,
-                    attacker_id=attacker.user_id,
-                    target_id=target.user_id,
-                    source="projectile",
-                    shield_blocked=not life_damage_applied,
-                    attacker_kind="player",
-                    attacker_monster_id=None,
-                )
-                if life_damage_applied and target.damage_taken >= hits_to_win:
-                    await self._kill_player(attacker, target)
+                active.append(projectile)
                 continue
 
             if projectile.owner_kind == "monster":
@@ -758,7 +764,7 @@ class OpenWorldService:
         return closest
 
     def _resolve_locked_target(self, player: OpenWorldPlayer) -> tuple[float, float, str, int] | None:
-        if player.target_kind not in {"player", "monster"} or player.target_id is None:
+        if player.target_kind not in {"player", "monster", "mine"} or player.target_id is None:
             player.target_kind = None
             player.target_id = None
             return None
@@ -774,11 +780,23 @@ class OpenWorldService:
                 return None
             return target.x, target.y, "player", target.user_id
         target_monster = self.state.monsters.get(player.target_id)
-        if target_monster is None:
+        if player.target_kind == "monster":
+            if target_monster is None:
+                player.target_kind = None
+                player.target_id = None
+                return None
+            return target_monster.x, target_monster.y, "monster", target_monster.monster_id
+
+        target_mine = next((mine for mine in self.state.mines if mine.mine_id == player.target_id), None)
+        if target_mine is None:
             player.target_kind = None
             player.target_id = None
             return None
-        return target_monster.x, target_monster.y, "monster", target_monster.monster_id
+        if target_mine.owner_user_id == player.user_id:
+            player.target_kind = None
+            player.target_id = None
+            return None
+        return target_mine.x, target_mine.y, "mine", target_mine.mine_id
 
     def _resolve_projectile_target(self, projectile: Projectile) -> tuple[float, float] | None:
         if projectile.target_kind == "player":
@@ -797,6 +815,15 @@ class OpenWorldService:
             if target_monster is None:
                 return None
             return target_monster.x, target_monster.y
+        if projectile.target_kind == "mine":
+            if projectile.target_entity_id is None:
+                return None
+            target_mine = next((mine for mine in self.state.mines if mine.mine_id == projectile.target_entity_id), None)
+            if target_mine is None:
+                return None
+            if target_mine.owner_user_id == projectile.owner_user_id:
+                return None
+            return target_mine.x, target_mine.y
         return None
 
     @staticmethod
