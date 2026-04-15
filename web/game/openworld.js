@@ -20,6 +20,7 @@ let controlsLocked = false;
 let matchTickRate = 20;
 let renderSmoothing = 0.25;
 let mineCooldownTicks = 100;
+let attackRange = 22;
 let hitsToDie = 3;
 let mineHitsToDestroy = 2;
 let shieldPoints = 2;
@@ -39,6 +40,9 @@ let selectedTargetType = null;
 let selectedTargetId = null;
 let autoFireEnabled = false;
 let autoFireTimer = null;
+let rangeMarkerSmoothedDistance = null;
+let rangeMarkerSmoothedAngle = null;
+let rangeMarkerLastTargetKey = '';
 const floatingTexts = [];
 const knownMinePositions = new Map();
 
@@ -177,7 +181,7 @@ function currentMoveY() {
 
 function sendInput(shoot = false, dropMine = false) {
   if (controlsLocked) return;
-  const canAutoShoot = autoFireEnabled && isSelectedTargetAlive();
+  const canAutoShoot = autoFireEnabled && isSelectedTargetAlive() && isSelectedTargetInRange();
   const safeShoot = isSelfInvulnerable() ? false : (shoot || canAutoShoot);
   send('player_input', {
     seq: ++inputSeq,
@@ -322,6 +326,53 @@ function isSelectedTargetAlive(snapshot = worldState) {
     return Boolean(mine && Number(mine.owner_user_id) !== Number(myUserId));
   }
   return false;
+}
+
+function getSelectedTargetPosition(snapshot = worldState) {
+  if (!snapshot || !selectedTargetType || !selectedTargetId) return null;
+  if (selectedTargetType === 'player') {
+    const target = findPlayerByUserId(snapshot, selectedTargetId);
+    if (!target || !target.alive || Number(target.user_id) === Number(myUserId)) return null;
+    return { x: Number(target.x), y: Number(target.y) };
+  }
+  if (selectedTargetType === 'monster') {
+    const target = findMonsterById(snapshot, selectedTargetId);
+    if (!target) return null;
+    return { x: Number(target.x), y: Number(target.y) };
+  }
+  if (selectedTargetType === 'mine') {
+    const target = findMineById(snapshot, selectedTargetId);
+    if (!target || Number(target.owner_user_id) === Number(myUserId)) return null;
+    return { x: Number(target.x), y: Number(target.y) };
+  }
+  return null;
+}
+
+function isSelectedTargetInRange(snapshot = worldState) {
+  const selfPlayer = findPlayerByUserId(snapshot, myUserId);
+  const targetPos = getSelectedTargetPosition(snapshot);
+  if (!selfPlayer || !targetPos) return false;
+  const edgeDistance = getSelectedTargetEdgeDistance(snapshot);
+  if (edgeDistance === null) return false;
+  return edgeDistance <= attackRange;
+}
+
+function getSelectedTargetClickRadius() {
+  if (selectedTargetType === 'player' || selectedTargetType === 'monster') {
+    return Math.max(2.2, playerHitRadius + 0.8);
+  }
+  if (selectedTargetType === 'mine') {
+    return Math.max(1.8, mineHitRadius + 0.8);
+  }
+  return 0;
+}
+
+function getSelectedTargetEdgeDistance(snapshot = worldState) {
+  const selfPlayer = findPlayerByUserId(snapshot, myUserId);
+  const targetPos = getSelectedTargetPosition(snapshot);
+  if (!selfPlayer || !targetPos) return null;
+  const centerDistance = visualDistance(selfPlayer.x, selfPlayer.y, targetPos.x, targetPos.y);
+  return Math.max(0, centerDistance - getSelectedTargetClickRadius());
 }
 
 function syncSelectedTargetWithState(snapshot) {
@@ -937,6 +988,69 @@ function drawPlayer(player) {
     context.restore();
   }
 
+  if (Number(player.user_id) === Number(myUserId)) {
+    const targetPosition = getSelectedTargetPosition();
+    if (targetPosition) {
+      const targetCanvasX = arenaToCanvasX(targetPosition.x);
+      const targetCanvasY = arenaToCanvasY(targetPosition.y);
+      const deltaX = targetCanvasX - x;
+      const deltaY = targetCanvasY - y;
+      const distancePx = Math.hypot(deltaX, deltaY);
+      if (distancePx > 0.0001) {
+        const targetDistance = getSelectedTargetEdgeDistance() ?? 0;
+        const inRange = targetDistance <= attackRange;
+        const clampedRange = Math.max(0.1, attackRange);
+        const markerDistanceArena = Math.min(targetDistance, clampedRange);
+        const markerRatio = Math.max(0, Math.min(1, markerDistanceArena / clampedRange));
+        const arcHalfSpan = 0.025 + (0.085 * markerRatio);
+        const targetAngle = Math.atan2(targetCanvasY - y, targetCanvasX - x);
+        const targetKey = `${selectedTargetType}:${selectedTargetId}`;
+        if (rangeMarkerLastTargetKey !== targetKey) {
+          rangeMarkerLastTargetKey = targetKey;
+          rangeMarkerSmoothedDistance = markerDistanceArena;
+          rangeMarkerSmoothedAngle = targetAngle;
+        } else {
+          const smoothFactor = 0.22;
+          if (rangeMarkerSmoothedDistance === null) {
+            rangeMarkerSmoothedDistance = markerDistanceArena;
+          } else {
+            rangeMarkerSmoothedDistance = lerp(rangeMarkerSmoothedDistance, markerDistanceArena, smoothFactor);
+          }
+          if (rangeMarkerSmoothedAngle === null) {
+            rangeMarkerSmoothedAngle = targetAngle;
+          } else {
+            let angleDelta = targetAngle - rangeMarkerSmoothedAngle;
+            while (angleDelta > Math.PI) angleDelta -= Math.PI * 2;
+            while (angleDelta < -Math.PI) angleDelta += Math.PI * 2;
+            rangeMarkerSmoothedAngle += angleDelta * smoothFactor;
+          }
+        }
+        const markerRadius = arenaRadiusToCanvasRadius(rangeMarkerSmoothedDistance ?? markerDistanceArena);
+        const markerAngle = rangeMarkerSmoothedAngle ?? targetAngle;
+
+        context.save();
+        context.strokeStyle = inRange ? '#ef4444' : 'rgba(203, 213, 225, 0.9)';
+        context.lineWidth = 3;
+        context.lineCap = 'round';
+        context.beginPath();
+        context.arc(
+          x,
+          y,
+          markerRadius,
+          markerAngle - arcHalfSpan,
+          markerAngle + arcHalfSpan
+        );
+        context.stroke();
+        context.restore();
+      }
+    }
+    if (!targetPosition) {
+      rangeMarkerSmoothedDistance = null;
+      rangeMarkerSmoothedAngle = null;
+      rangeMarkerLastTargetKey = '';
+    }
+  }
+
   const lifeRatio = Math.max(0, (hitsToDie - Number(player.damage_taken || 0)) / Math.max(1, hitsToDie));
   const shieldRatio = shieldPoints > 0 ? Number(player.shield_points || 0) / Math.max(1, shieldPoints) : 0;
   drawRectHealthBar(x, y - 67, 56, 7, shieldRatio, '#60a5fa');
@@ -1101,6 +1215,7 @@ async function fetchSession() {
   }
   myUserId = data.user_id;
   if (typeof data.mine_cooldown_ticks === 'number') mineCooldownTicks = Math.max(1, Math.floor(data.mine_cooldown_ticks));
+  if (typeof data.attack_range === 'number') attackRange = Math.max(0.1, Number(data.attack_range));
   if (typeof data.render_smoothing === 'number') {
     renderSmoothing = Math.max(0, Math.min(1, data.render_smoothing));
   }
@@ -1261,7 +1376,7 @@ canvas.addEventListener('mousedown', (event) => {
   const clickedTarget = findClickableTargetAtPointer();
   if (clickedTarget) {
     setSelectedTarget(clickedTarget.targetType, clickedTarget.targetId);
-  } else {
+  } else if (event.detail <= 1) {
     setSelectedTarget(null, null);
   }
   if (isSelfInvulnerable()) {
@@ -1275,11 +1390,12 @@ canvas.addEventListener('dblclick', (event) => {
   if (event.button !== 0) return;
   syncPointerFromEvent(event);
   const clickedTarget = findClickableTargetAtPointer();
-  if (!clickedTarget) {
+  if (clickedTarget) {
+    setSelectedTarget(clickedTarget.targetType, clickedTarget.targetId);
+  } else if (!isSelectedTargetAlive()) {
     setSelectedTarget(null, null);
     return;
   }
-  setSelectedTarget(clickedTarget.targetType, clickedTarget.targetId);
   if (isSelectedTargetAlive()) setAutoFire(true);
 });
 

@@ -20,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $movementSpeed = (float) ($_POST['movement_speed'] ?? 3.0);
             $hitsToWin = (int) ($_POST['hits_to_win'] ?? 3);
             $fireCooldownTicks = (int) ($_POST['fire_cooldown_ticks'] ?? 6);
+            $attackRange = (float) ($_POST['attack_range'] ?? 22);
             $mineCooldownTicks = (int) ($_POST['mine_cooldown_ticks'] ?? 100);
             $wsMode = (string) ($_POST['ws_mode'] ?? 'vps');
             $renderSmoothing = (float) ($_POST['render_smoothing'] ?? 0.25);
@@ -43,6 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 || $movementSpeed <= 0
                 || $hitsToWin <= 0
                 || $fireCooldownTicks <= 0
+                || $attackRange <= 0
                 || $mineCooldownTicks <= 0
                 || !in_array($wsMode, ['vps', 'local'], true)
                 || $renderSmoothing < 0
@@ -73,6 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute(['setting_key' => $modePrefix . 'movement_speed', 'setting_value' => (string) $movementSpeed]);
             $stmt->execute(['setting_key' => $modePrefix . 'hits_to_win', 'setting_value' => (string) $hitsToWin]);
             $stmt->execute(['setting_key' => $modePrefix . 'fire_cooldown_ticks', 'setting_value' => (string) $fireCooldownTicks]);
+            $stmt->execute(['setting_key' => $modePrefix . 'attack_range', 'setting_value' => (string) $attackRange]);
             $stmt->execute(['setting_key' => $modePrefix . 'mine_cooldown_ticks', 'setting_value' => (string) $mineCooldownTicks]);
             $stmt->execute(['setting_key' => $modePrefix . 'render_smoothing', 'setting_value' => (string) $renderSmoothing]);
             $stmt->execute(['setting_key' => $modePrefix . 'player_hitbox_radius', 'setting_value' => (string) $playerHitboxRadius]);
@@ -162,6 +165,10 @@ render_header($settingsTitle);
                     <label>
                         <span>Intervalo entre disparos por clique (ticks)</span>
                         <input type="number" step="1" min="1" name="fire_cooldown_ticks" value="<?= htmlspecialchars($getSetting('fire_cooldown_ticks', '6'), ENT_QUOTES, 'UTF-8') ?>" required>
+                    </label>
+                    <label>
+                        <span>Range de disparo</span>
+                        <input type="number" step="0.1" min="0.1" name="attack_range" value="<?= htmlspecialchars($getSetting('attack_range', '22'), ENT_QUOTES, 'UTF-8') ?>" required>
                     </label>
 
                     <h2>Minas</h2>

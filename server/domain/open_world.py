@@ -311,6 +311,7 @@ class OpenWorldService:
     async def _apply_inputs(self, game_settings: dict[str, float]) -> None:
         movement_speed = game_settings["movement_speed"]
         fire_cooldown_ticks = max(1, int(game_settings["fire_cooldown_ticks"]))
+        attack_range = max(0.1, float(game_settings["attack_range"]))
         mine_cooldown_ticks = max(1, int(game_settings["mine_cooldown_ticks"]))
         shield_points_max = max(0, int(game_settings["shield_points"]))
 
@@ -348,6 +349,11 @@ class OpenWorldService:
                     if locked_target is None:
                         continue
                     target_x, target_y, target_kind, target_entity_id = locked_target
+                    target_distance = self._visual_distance(player.x, player.y, target_x, target_y)
+                    target_click_radius = self._target_click_radius(game_settings, target_kind)
+                    target_distance = max(0.0, target_distance - target_click_radius)
+                    if target_distance > attack_range:
+                        continue
                     delta_x = target_x - player.x
                     delta_y = target_y - player.y
                     distance = math.hypot(delta_x, delta_y) or 1.0
@@ -825,6 +831,16 @@ class OpenWorldService:
                 return None
             return target_mine.x, target_mine.y
         return None
+
+    @staticmethod
+    def _target_click_radius(game_settings: dict[str, float], target_kind: str) -> float:
+        if target_kind in {"player", "monster"}:
+            player_hitbox_radius = float(game_settings["player_hitbox_radius"])
+            return max(2.2, player_hitbox_radius + 0.8)
+        if target_kind == "mine":
+            mine_hitbox_radius = float(game_settings["mine_hitbox_radius"])
+            return max(1.8, mine_hitbox_radius + 0.8)
+        return 0.0
 
     @staticmethod
     def _sync_shield_state(player: OpenWorldPlayer, shield_points_max: int, current_tick: int) -> None:
