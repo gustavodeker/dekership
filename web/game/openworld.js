@@ -181,7 +181,7 @@ function currentMoveY() {
 
 function sendInput(shoot = false, dropMine = false) {
   if (controlsLocked) return;
-  const canAutoShoot = autoFireEnabled && isSelectedTargetAlive() && isSelectedTargetInRange();
+  const canAutoShoot = autoFireEnabled && isSelectedTargetAlive();
   const safeShoot = isSelfInvulnerable() ? false : (shoot || canAutoShoot);
   send('player_input', {
     seq: ++inputSeq,

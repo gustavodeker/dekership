@@ -320,9 +320,6 @@ class OpenWorldService:
             if not player.alive:
                 continue
             locked_target = self._resolve_locked_target(player)
-            if locked_target is not None:
-                player.aim_x = locked_target[0]
-                player.aim_y = locked_target[1]
 
             input_x = float(player.move_x)
             input_y = float(player.move_y)
@@ -341,6 +338,14 @@ class OpenWorldService:
             next_y = max(0.0, min(100.0, player.y + (move_y * movement_speed)))
             if not self._collides_with_obstacle(player.x, next_y, self.player_collision_radius):
                 player.y = next_y
+
+            attacking_target = player.shoot_requested and locked_target is not None and self.state.tick >= player.invulnerable_until_tick
+            if attacking_target:
+                player.aim_x = locked_target[0]
+                player.aim_y = locked_target[1]
+            elif input_magnitude > 0.0:
+                player.aim_x = max(0.0, min(100.0, player.x + (move_x * 12.0)))
+                player.aim_y = max(0.0, min(100.0, player.y + (move_y * 12.0)))
 
             if player.shoot_requested:
                 player.shoot_requested = False
