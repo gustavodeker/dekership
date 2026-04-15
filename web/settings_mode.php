@@ -38,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $monsterMaxAlive = (int) ($_POST['monster_max_alive'] ?? 8);
             $monsterLife = (int) ($_POST['monster_life'] ?? 6);
             $monsterName = trim((string) ($_POST['monster_name'] ?? '-=[ Lordakia ]=-'));
+            $monsterNameLength = function_exists('mb_strlen') ? mb_strlen($monsterName, 'UTF-8') : strlen($monsterName);
             $monsterMoveSpeed = (float) ($_POST['monster_move_speed'] ?? 1.2);
             $monsterHitboxRadius = (float) ($_POST['monster_hitbox_radius'] ?? 5.4);
             $monsterDetectionRadius = (float) ($_POST['monster_detection_radius'] ?? 26);
@@ -73,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 || $monsterMaxAlive < 0
                 || $monsterLife <= 0
                 || $monsterName === ''
-                || mb_strlen($monsterName, 'UTF-8') > 50
+                || $monsterNameLength > 50
                 || $monsterMoveSpeed <= 0
                 || $monsterHitboxRadius <= 0
                 || $monsterDetectionRadius <= 0
