@@ -13,6 +13,11 @@ const shieldRegenValueNode = document.getElementById('shield-regen-value');
 const shieldRegenBoxNode = document.getElementById('shield-regen-box');
 const DESIGN_WIDTH = canvas.width;
 const DESIGN_HEIGHT = canvas.height;
+const WORLD_WIDTH = 100;
+const WORLD_HEIGHT = 100;
+const CAMERA_ZOOM_FACTOR = 2;
+const CAMERA_VIEW_WIDTH = WORLD_WIDTH / CAMERA_ZOOM_FACTOR;
+const CAMERA_VIEW_HEIGHT = WORLD_HEIGHT / CAMERA_ZOOM_FACTOR;
 
 let ws;
 let requestId = 0;
@@ -31,6 +36,7 @@ let mineHitsToDestroy = 2;
 let shieldPoints = 2;
 let shieldRegenSeconds = 10;
 let playerHitRadius = 5.4;
+let monsterHitRadius = 5.4;
 let projectileHitRadius = 0.6;
 let mineHitRadius = 2.4;
 let showHitbox = true;
@@ -48,6 +54,12 @@ let autoFireTimer = null;
 let rangeMarkerSmoothedDistance = null;
 let rangeMarkerSmoothedAngle = null;
 let rangeMarkerLastTargetKey = '';
+let cameraState = {
+  left: 0,
+  top: 0,
+  width: WORLD_WIDTH,
+  height: WORLD_HEIGHT,
+};
 const floatingTexts = [];
 const knownMinePositions = new Map();
 
@@ -252,20 +264,31 @@ function syncPointerFromEvent(event) {
   const rect = canvas.getBoundingClientRect();
   const canvasX = ((event.clientX - rect.left) / rect.width) * canvas.width;
   const canvasY = ((event.clientY - rect.top) / rect.height) * canvas.height;
-  pointer.x = Math.max(0, Math.min(100, (canvasX / canvas.width) * 100));
-  pointer.y = Math.max(0, Math.min(100, (canvasY / canvas.height) * 100));
+  const camera = cameraState;
+  pointer.x = Math.max(0, Math.min(WORLD_WIDTH, camera.left + ((canvasX / canvas.width) * camera.width)));
+  pointer.y = Math.max(0, Math.min(WORLD_HEIGHT, camera.top + ((canvasY / canvas.height) * camera.height)));
 }
 
 function arenaToCanvasX(x) {
-  return (x / 100) * canvas.width;
+  return ((x - cameraState.left) / cameraState.width) * canvas.width;
 }
 
 function arenaToCanvasY(y) {
-  return (y / 100) * canvas.height;
+  return ((y - cameraState.top) / cameraState.height) * canvas.height;
 }
 
 function arenaRadiusToCanvasRadius(radius) {
-  return Math.min(arenaToCanvasX(radius), arenaToCanvasY(radius));
+  const scaleX = canvas.width / cameraState.width;
+  const scaleY = canvas.height / cameraState.height;
+  return radius * Math.min(scaleX, scaleY);
+}
+
+function arenaWidthToCanvas(width) {
+  return (width / cameraState.width) * canvas.width;
+}
+
+function arenaHeightToCanvas(height) {
+  return (height / cameraState.height) * canvas.height;
 }
 
 function lerp(from, to, alpha) {
@@ -363,8 +386,11 @@ function isSelectedTargetInRange(snapshot = worldState) {
 }
 
 function getSelectedTargetClickRadius() {
-  if (selectedTargetType === 'player' || selectedTargetType === 'monster') {
+  if (selectedTargetType === 'player') {
     return Math.max(2.2, playerHitRadius + 0.8);
+  }
+  if (selectedTargetType === 'monster') {
+    return Math.max(2.2, monsterHitRadius + 0.8);
   }
   if (selectedTargetType === 'mine') {
     return Math.max(1.8, mineHitRadius + 0.8);
@@ -421,7 +447,7 @@ function findClickableTargetAtPointer() {
 
   for (const monster of (worldState.monsters || [])) {
     const distance = visualDistance(baseX, baseY, monster.x, monster.y);
-    const hitDistance = Math.max(2.2, playerHitRadius + 0.8);
+    const hitDistance = Math.max(2.2, monsterHitRadius + 0.8);
     if (distance > hitDistance) continue;
     if (!best || distance < best.distance) {
       best = { targetType: 'monster', targetId: Number(monster.monster_id), distance };
@@ -524,6 +550,24 @@ function blendWorldState(current, target, alpha) {
   };
 }
 
+function updateCamera(snapshot) {
+  const selfPlayer = findPlayerByUserId(snapshot, myUserId);
+  if (!selfPlayer) {
+    cameraState = { left: 0, top: 0, width: WORLD_WIDTH, height: WORLD_HEIGHT };
+    return;
+  }
+  const halfW = CAMERA_VIEW_WIDTH / 2;
+  const halfH = CAMERA_VIEW_HEIGHT / 2;
+  const left = Math.max(0, Math.min(WORLD_WIDTH - CAMERA_VIEW_WIDTH, Number(selfPlayer.x) - halfW));
+  const top = Math.max(0, Math.min(WORLD_HEIGHT - CAMERA_VIEW_HEIGHT, Number(selfPlayer.y) - halfH));
+  cameraState = {
+    left,
+    top,
+    width: CAMERA_VIEW_WIDTH,
+    height: CAMERA_VIEW_HEIGHT,
+  };
+}
+
 function updateDeathOverlay() {
   const selfPlayer = getSelfPlayer();
   if (!selfPlayer || selfPlayer.alive) {
@@ -622,16 +666,16 @@ function drawObstacle(obstacle) {
   context.fillRect(
     arenaToCanvasX(obstacle.x),
     arenaToCanvasY(obstacle.y),
-    arenaToCanvasX(obstacle.width),
-    arenaToCanvasY(obstacle.height)
+    arenaWidthToCanvas(obstacle.width),
+    arenaHeightToCanvas(obstacle.height)
   );
   context.strokeStyle = '#64748b';
   context.lineWidth = 2;
   context.strokeRect(
     arenaToCanvasX(obstacle.x),
     arenaToCanvasY(obstacle.y),
-    arenaToCanvasX(obstacle.width),
-    arenaToCanvasY(obstacle.height)
+    arenaWidthToCanvas(obstacle.width),
+    arenaHeightToCanvas(obstacle.height)
   );
 }
 
@@ -857,7 +901,7 @@ function drawMonster(monster) {
     context.strokeStyle = 'rgba(249, 115, 22, 0.8)';
     context.lineWidth = 2;
     context.beginPath();
-    context.arc(x, y, arenaRadiusToCanvasRadius(playerHitRadius), 0, Math.PI * 2);
+    context.arc(x, y, arenaRadiusToCanvasRadius(monsterHitRadius), 0, Math.PI * 2);
     context.stroke();
     context.restore();
   }
@@ -883,6 +927,7 @@ function drawSelectedTargetMarker(stateSnapshot) {
     if (!target) return;
     targetX = Number(target.x);
     targetY = Number(target.y);
+    radiusArena = monsterHitRadius + 1.2;
   } else if (selectedTargetType === 'mine') {
     const target = findMineById(stateSnapshot, selectedTargetId);
     if (!target) return;
@@ -1171,6 +1216,80 @@ function drawFloatingTexts() {
   }
 }
 
+function drawMinimap(snapshot) {
+  if (!snapshot) return;
+  const size = 150;
+  const padding = 14;
+  const left = padding;
+  const top = canvas.height - size - padding;
+  const scaleX = size / WORLD_WIDTH;
+  const scaleY = size / WORLD_HEIGHT;
+
+  context.save();
+  context.fillStyle = 'rgba(7, 14, 24, 0.78)';
+  context.fillRect(left, top, size, size);
+  context.strokeStyle = 'rgba(148, 163, 184, 0.55)';
+  context.lineWidth = 1;
+  context.strokeRect(left, top, size, size);
+
+  for (const obstacle of (snapshot.obstacles || [])) {
+    context.fillStyle = 'rgba(100, 116, 139, 0.6)';
+    context.fillRect(
+      left + (Number(obstacle.x) * scaleX),
+      top + (Number(obstacle.y) * scaleY),
+      Number(obstacle.width) * scaleX,
+      Number(obstacle.height) * scaleY
+    );
+  }
+
+  for (const mine of (snapshot.mines || [])) {
+    context.fillStyle = Number(mine.owner_user_id) === Number(myUserId) ? '#22c55e' : '#f59e0b';
+    context.fillRect(
+      left + (Number(mine.x) * scaleX) - 1,
+      top + (Number(mine.y) * scaleY) - 1,
+      2,
+      2
+    );
+  }
+
+  for (const monster of (snapshot.monsters || [])) {
+    context.fillStyle = '#f97316';
+    context.beginPath();
+    context.arc(
+      left + (Number(monster.x) * scaleX),
+      top + (Number(monster.y) * scaleY),
+      2,
+      0,
+      Math.PI * 2
+    );
+    context.fill();
+  }
+
+  for (const player of (snapshot.players || [])) {
+    if (!player.alive) continue;
+    context.fillStyle = Number(player.user_id) === Number(myUserId) ? '#22c55e' : '#f8fafc';
+    context.beginPath();
+    context.arc(
+      left + (Number(player.x) * scaleX),
+      top + (Number(player.y) * scaleY),
+      2.5,
+      0,
+      Math.PI * 2
+    );
+    context.fill();
+  }
+
+  context.strokeStyle = 'rgba(34, 197, 94, 0.9)';
+  context.lineWidth = 1.1;
+  context.strokeRect(
+    left + (cameraState.left * scaleX),
+    top + (cameraState.top * scaleY),
+    cameraState.width * scaleX,
+    cameraState.height * scaleY
+  );
+  context.restore();
+}
+
 function triggerShieldRegenEffects(previousSnapshot, currentSnapshot) {
   if (!previousSnapshot || !currentSnapshot) return;
   const previousById = new Map(
@@ -1191,6 +1310,7 @@ function render() {
   context.fillRect(0, 0, canvas.width, canvas.height);
   if (worldState) {
     renderState = blendWorldState(renderState, worldState, renderSmoothing);
+    updateCamera(renderState);
     for (const mine of (worldState.mines || [])) {
       knownMinePositions.set(Number(mine.mine_id), { x: Number(mine.x), y: Number(mine.y) });
     }
@@ -1200,6 +1320,7 @@ function render() {
     (renderState.players || []).forEach(drawPlayer);
     drawSelectedTargetMarker(renderState);
     (renderState.projectiles || []).forEach(drawProjectile);
+    drawMinimap(renderState);
   }
   drawFloatingTexts();
   requestAnimationFrame(render);
@@ -1264,6 +1385,7 @@ async function fetchSession() {
   if (typeof data.shield_points === 'number') shieldPoints = Math.max(0, Math.floor(data.shield_points));
   if (typeof data.shield_regen_seconds === 'number') shieldRegenSeconds = Math.max(1, Math.floor(data.shield_regen_seconds));
   if (typeof data.player_hitbox_radius === 'number') playerHitRadius = Math.max(0.1, data.player_hitbox_radius);
+  if (typeof data.monster_hitbox_radius === 'number') monsterHitRadius = Math.max(0.1, data.monster_hitbox_radius);
   if (typeof data.projectile_hitbox_radius === 'number') projectileHitRadius = Math.max(0.1, data.projectile_hitbox_radius);
   if (typeof data.mine_hitbox_radius === 'number') mineHitRadius = Math.max(0.1, data.mine_hitbox_radius);
   if (typeof data.show_hitbox === 'boolean') showHitbox = data.show_hitbox;

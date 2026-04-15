@@ -93,6 +93,8 @@ class OpenWorldService:
         self.player_collision_radius = 2.8
         self.monster_collision_radius = 2.8
         self.visual_x_axis_factor = 768.0 / 1366.0
+        self.camera_zoom_factor = 2.0
+        self.visual_speed_factor = 1.0 / self.camera_zoom_factor
         self.state = OpenWorldState()
         self.state.max_players = max_players
         self.task: asyncio.Task | None = None
@@ -251,6 +253,7 @@ class OpenWorldService:
 
     async def _tick(self) -> None:
         game_settings = await self.game_config.get_settings("open_world")
+        self.monster_collision_radius = max(0.1, float(game_settings["monster_hitbox_radius"]))
         await self._sync_monsters_population(game_settings)
         await self._apply_shield_regen(game_settings)
         await self._apply_inputs(game_settings)
@@ -303,12 +306,13 @@ class OpenWorldService:
         self.state.next_monster_id += 1
 
     async def _apply_inputs(self, game_settings: dict[str, float]) -> None:
-        movement_speed = game_settings["movement_speed"]
+        movement_speed = game_settings["movement_speed"] * self.visual_speed_factor
         fire_cooldown_ticks = max(1, int(game_settings["fire_cooldown_ticks"]))
         attack_range = max(0.1, float(game_settings["attack_range"]))
         mine_cooldown_ticks = max(1, int(game_settings["mine_cooldown_ticks"]))
         mine_max_active_per_player = max(1, int(game_settings["mine_max_active_per_player"]))
         shield_points_max = max(0, int(game_settings["shield_points"]))
+        projectile_speed = float(game_settings["projectile_speed"]) * self.visual_speed_factor
         border_padding = max(
             self.player_collision_radius,
             float(game_settings["player_hitbox_radius"]) * self.visual_x_axis_factor,
@@ -368,9 +372,9 @@ class OpenWorldService:
                             owner_user_id=player.user_id,
                             x=player.x,
                             y=player.y,
-                            velocity_x=(delta_x / distance) * game_settings["projectile_speed"],
-                            velocity_y=(delta_y / distance) * game_settings["projectile_speed"],
-                            speed=game_settings["projectile_speed"],
+                            velocity_x=(delta_x / distance) * projectile_speed,
+                            velocity_y=(delta_y / distance) * projectile_speed,
+                            speed=projectile_speed,
                             owner_kind="player",
                             owner_entity_id=player.user_id,
                             target_kind=target_kind,
@@ -400,9 +404,9 @@ class OpenWorldService:
     async def _advance_monsters(self, game_settings: dict[str, float]) -> None:
         if not self.state.monsters:
             return
-        monster_speed = float(game_settings["monster_move_speed"])
+        monster_speed = float(game_settings["monster_move_speed"]) * self.visual_speed_factor
         fire_cooldown_ticks = max(1, int(game_settings["monster_fire_cooldown_ticks"]))
-        projectile_speed = float(game_settings["monster_projectile_speed"])
+        projectile_speed = float(game_settings["monster_projectile_speed"]) * self.visual_speed_factor
 
         for monster in self.state.monsters.values():
             if (self.state.tick - monster.last_retarget_tick) >= self.tick_rate * 3 or self._visual_distance(
@@ -881,9 +885,12 @@ class OpenWorldService:
 
     @staticmethod
     def _target_click_radius(game_settings: dict[str, float], target_kind: str) -> float:
-        if target_kind in {"player", "monster"}:
+        if target_kind == "player":
             player_hitbox_radius = float(game_settings["player_hitbox_radius"])
             return max(2.2, player_hitbox_radius + 0.8)
+        if target_kind == "monster":
+            monster_hitbox_radius = float(game_settings["monster_hitbox_radius"])
+            return max(2.2, monster_hitbox_radius + 0.8)
         if target_kind == "mine":
             mine_hitbox_radius = float(game_settings["mine_hitbox_radius"])
             return max(1.8, mine_hitbox_radius + 0.8)

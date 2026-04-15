@@ -35,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $monsterMaxAlive = (int) ($_POST['monster_max_alive'] ?? 8);
             $monsterLife = (int) ($_POST['monster_life'] ?? 6);
             $monsterMoveSpeed = (float) ($_POST['monster_move_speed'] ?? 1.2);
+            $monsterHitboxRadius = (float) ($_POST['monster_hitbox_radius'] ?? 5.4);
             $monsterProjectileSpeed = (float) ($_POST['monster_projectile_speed'] ?? 1.1);
             $monsterFireCooldownTicks = (int) ($_POST['monster_fire_cooldown_ticks'] ?? 35);
             $monsterRespawnSeconds = (int) ($_POST['monster_respawn_seconds'] ?? 5);
@@ -61,6 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 || $monsterMaxAlive < 0
                 || $monsterLife <= 0
                 || $monsterMoveSpeed <= 0
+                || $monsterHitboxRadius <= 0
                 || $monsterProjectileSpeed <= 0
                 || $monsterFireCooldownTicks <= 0
                 || $monsterRespawnSeconds <= 0
@@ -97,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute(['setting_key' => $modePrefix . 'monster_max_alive', 'setting_value' => (string) $monsterMaxAlive]);
             $stmt->execute(['setting_key' => $modePrefix . 'monster_life', 'setting_value' => (string) $monsterLife]);
             $stmt->execute(['setting_key' => $modePrefix . 'monster_move_speed', 'setting_value' => (string) $monsterMoveSpeed]);
+            $stmt->execute(['setting_key' => $modePrefix . 'monster_hitbox_radius', 'setting_value' => (string) $monsterHitboxRadius]);
             $stmt->execute(['setting_key' => $modePrefix . 'monster_projectile_speed', 'setting_value' => (string) $monsterProjectileSpeed]);
             $stmt->execute(['setting_key' => $modePrefix . 'monster_fire_cooldown_ticks', 'setting_value' => (string) $monsterFireCooldownTicks]);
             $stmt->execute(['setting_key' => $modePrefix . 'monster_respawn_seconds', 'setting_value' => (string) $monsterRespawnSeconds]);
@@ -244,6 +247,10 @@ render_header($settingsTitle);
                         <label>
                             <span>Velocidade de movimento</span>
                             <input type="number" step="0.1" min="0.1" name="monster_move_speed" value="<?= htmlspecialchars($getSetting('monster_move_speed', '1.2'), ENT_QUOTES, 'UTF-8') ?>" required>
+                        </label>
+                        <label>
+                            <span>Hitbox / clique do monstro</span>
+                            <input type="number" step="0.1" min="0.1" name="monster_hitbox_radius" value="<?= htmlspecialchars($getSetting('monster_hitbox_radius', '5.4'), ENT_QUOTES, 'UTF-8') ?>" required>
                         </label>
                         <label>
                             <span>Velocidade do projetil</span>
