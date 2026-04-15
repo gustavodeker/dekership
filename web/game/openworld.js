@@ -928,6 +928,19 @@ function drawMonster(monster) {
   const maxHp = Math.max(1, Number(monster.max_hp || 1));
   const hp = Math.max(0, Number(monster.hp || 0));
   drawRectHealthBar(x, y - 34, 52, 7, hp / maxHp, '#f97316');
+
+  const monsterName = String(monster.name || '').trim() || '-=[ Lordakia ]=-';
+  const targetingMe = Number(monster.target_player_id || 0) === Number(myUserId);
+  context.save();
+  context.font = '600 13px Arial';
+  context.textAlign = 'center';
+  context.textBaseline = 'top';
+  context.lineWidth = 4;
+  context.strokeStyle = 'rgba(15, 23, 42, 0.9)';
+  context.fillStyle = targetingMe ? '#ef4444' : '#f8fafc';
+  context.strokeText(monsterName, x, y + 21);
+  context.fillText(monsterName, x, y + 21);
+  context.restore();
 }
 
 function drawSelectedTargetMarker(stateSnapshot) {

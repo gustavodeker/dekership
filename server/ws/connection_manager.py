@@ -247,6 +247,8 @@ class ConnectionManager:
                     "monster_id": monster.monster_id,
                     "x": monster.x,
                     "y": monster.y,
+                    "name": monster.name,
+                    "target_player_id": monster.target_player_id,
                     "aim_x": monster.aim_x,
                     "aim_y": monster.aim_y,
                     "hp": monster.hp,

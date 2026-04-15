@@ -45,6 +45,7 @@ class OpenWorldMonster:
     monster_id: int
     x: float
     y: float
+    name: str
     aim_x: float
     aim_y: float
     hp: int
@@ -69,9 +70,12 @@ class OpenWorldState:
     mines: list[Mine] = field(default_factory=list)
     obstacles: list[Obstacle] = field(
         default_factory=lambda: [
-            Obstacle(x=44.0, y=35.0, width=12.0, height=30.0),
-            Obstacle(x=20.0, y=45.0, width=10.0, height=14.0),
-            Obstacle(x=70.0, y=45.0, width=10.0, height=14.0),
+            Obstacle(x=14.0, y=14.0, width=8.0, height=10.0),
+            Obstacle(x=36.0, y=22.0, width=7.0, height=9.0),
+            Obstacle(x=62.0, y=16.0, width=8.0, height=10.0),
+            Obstacle(x=22.0, y=56.0, width=9.0, height=11.0),
+            Obstacle(x=48.0, y=64.0, width=8.0, height=10.0),
+            Obstacle(x=74.0, y=52.0, width=9.0, height=12.0),
         ]
     )
     next_projectile_id: int = 1
@@ -266,18 +270,22 @@ class OpenWorldService:
     async def _sync_monsters_population(self, game_settings: dict[str, float]) -> None:
         max_alive = max(0, int(game_settings["monster_max_alive"]))
         monster_life = max(1, int(game_settings["monster_life"]))
+        monster_name = str(game_settings.get("monster_name", "-=[ Lordakia ]=-")).strip() or "-=[ Lordakia ]=-"
 
         self.state.pending_monster_respawns = sorted(self.state.pending_monster_respawns)
         while self.state.pending_monster_respawns and self.state.pending_monster_respawns[0] <= self.state.tick:
             if len(self.state.monsters) >= max_alive:
                 break
             self.state.pending_monster_respawns.pop(0)
-            self._spawn_monster(monster_life)
+            self._spawn_monster(monster_life, monster_name)
 
         total_reserved = len(self.state.monsters) + len(self.state.pending_monster_respawns)
         while total_reserved < max_alive:
-            self._spawn_monster(monster_life)
+            self._spawn_monster(monster_life, monster_name)
             total_reserved = len(self.state.monsters) + len(self.state.pending_monster_respawns)
+
+        for monster in self.state.monsters.values():
+            monster.name = monster_name
 
         while len(self.state.monsters) > max_alive:
             monster_id = next(iter(self.state.monsters.keys()))
@@ -288,13 +296,14 @@ class OpenWorldService:
                 break
             self.state.pending_monster_respawns.pop()
 
-    def _spawn_monster(self, monster_life: int) -> None:
+    def _spawn_monster(self, monster_life: int, monster_name: str) -> None:
         x, y = self._random_monster_spawn_position()
         target_x, target_y = self._random_walk_target()
         monster = OpenWorldMonster(
             monster_id=self.state.next_monster_id,
             x=x,
             y=y,
+            name=monster_name,
             aim_x=target_x,
             aim_y=target_y,
             hp=monster_life,

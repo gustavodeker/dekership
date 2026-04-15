@@ -34,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $respawnInvulnerabilitySeconds = (int) ($_POST['respawn_invulnerability_seconds'] ?? 2);
             $monsterMaxAlive = (int) ($_POST['monster_max_alive'] ?? 8);
             $monsterLife = (int) ($_POST['monster_life'] ?? 6);
+            $monsterName = trim((string) ($_POST['monster_name'] ?? '-=[ Lordakia ]=-'));
             $monsterMoveSpeed = (float) ($_POST['monster_move_speed'] ?? 1.2);
             $monsterHitboxRadius = (float) ($_POST['monster_hitbox_radius'] ?? 5.4);
             $monsterDetectionRadius = (float) ($_POST['monster_detection_radius'] ?? 26);
@@ -65,6 +66,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 || $respawnInvulnerabilitySeconds <= 0
                 || $monsterMaxAlive < 0
                 || $monsterLife <= 0
+                || $monsterName === ''
+                || mb_strlen($monsterName, 'UTF-8') > 50
                 || $monsterMoveSpeed <= 0
                 || $monsterHitboxRadius <= 0
                 || $monsterDetectionRadius <= 0
@@ -105,6 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
             $stmt->execute(['setting_key' => $modePrefix . 'monster_max_alive', 'setting_value' => (string) $monsterMaxAlive]);
             $stmt->execute(['setting_key' => $modePrefix . 'monster_life', 'setting_value' => (string) $monsterLife]);
+            $stmt->execute(['setting_key' => $modePrefix . 'monster_name', 'setting_value' => $monsterName]);
             $stmt->execute(['setting_key' => $modePrefix . 'monster_move_speed', 'setting_value' => (string) $monsterMoveSpeed]);
             $stmt->execute(['setting_key' => $modePrefix . 'monster_hitbox_radius', 'setting_value' => (string) $monsterHitboxRadius]);
             $stmt->execute(['setting_key' => $modePrefix . 'monster_detection_radius', 'setting_value' => (string) $monsterDetectionRadius]);
@@ -254,6 +258,10 @@ render_header($settingsTitle);
                         <label>
                             <span>Vida do monstro</span>
                             <input type="number" step="1" min="1" name="monster_life" value="<?= htmlspecialchars($getSetting('monster_life', '6'), ENT_QUOTES, 'UTF-8') ?>" required>
+                        </label>
+                        <label>
+                            <span>Nome do monstro</span>
+                            <input type="text" name="monster_name" maxlength="50" value="<?= htmlspecialchars($getSetting('monster_name', '-=[ Lordakia ]=-'), ENT_QUOTES, 'UTF-8') ?>" required>
                         </label>
                         <label>
                             <span>Velocidade de movimento</span>
