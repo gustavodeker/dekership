@@ -77,6 +77,7 @@ class SimulationService:
         movement_speed = game_settings["movement_speed"]
         fire_cooldown_ticks = max(1, int(game_settings["fire_cooldown_ticks"]))
         mine_cooldown_ticks = max(1, int(game_settings["mine_cooldown_ticks"]))
+        mine_max_active_per_player = max(1, int(game_settings["mine_max_active_per_player"]))
         shield_points_max = max(0, int(game_settings["shield_points"]))
         for match_player in match.players.values():
             self._sync_shield_state_for_match(match_player, shield_points_max, match.tick)
@@ -129,6 +130,9 @@ class SimulationService:
             if player_state.mine_requested:
                 player_state.mine_requested = False
                 if (match.tick - match_player.last_mine_tick) >= mine_cooldown_ticks:
+                    owned_mines = sum(1 for mine in match.mines if mine.owner_user_id == match_player.user_id)
+                    if owned_mines >= mine_max_active_per_player:
+                        continue
                     match_player.last_mine_tick = match.tick
                     match.mines.append(
                         Mine(

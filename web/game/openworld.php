@@ -17,11 +17,11 @@ render_header('Mundo Aberto');
         <button id="open-world-respawn-btn" type="button" hidden>Renascer</button>
     </div>
     <div id="shield-regen-box" class="shield-regen-box" aria-live="polite">
-        <div class="shield-regen-box__label">ESCUDO</div>
+        <div id="shield-regen-label" class="shield-regen-box__label">ESCUDO 0/0</div>
         <div id="shield-regen-value" class="shield-regen-box__value">READY</div>
     </div>
     <div id="mine-cooldown-box" class="mine-cooldown-box" aria-live="polite">
-        <div class="mine-cooldown-box__label">MINA (1)</div>
+        <div id="mine-cooldown-label" class="mine-cooldown-box__label">MINA 0/0</div>
         <div id="mine-cooldown-value" class="mine-cooldown-box__value">READY</div>
     </div>
 </section>

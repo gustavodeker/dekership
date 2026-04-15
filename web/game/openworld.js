@@ -6,7 +6,11 @@ const deathOverlayNode = document.getElementById('open-world-death-overlay');
 const deathCountdownNode = document.getElementById('open-world-death-countdown');
 const respawnButton = document.getElementById('open-world-respawn-btn');
 const mineCooldownValueNode = document.getElementById('mine-cooldown-value');
+const mineCooldownLabelNode = document.getElementById('mine-cooldown-label');
+const mineCooldownBoxNode = document.getElementById('mine-cooldown-box');
+const shieldRegenLabelNode = document.getElementById('shield-regen-label');
 const shieldRegenValueNode = document.getElementById('shield-regen-value');
+const shieldRegenBoxNode = document.getElementById('shield-regen-box');
 const DESIGN_WIDTH = canvas.width;
 const DESIGN_HEIGHT = canvas.height;
 
@@ -20,6 +24,7 @@ let controlsLocked = false;
 let matchTickRate = 20;
 let renderSmoothing = 0.25;
 let mineCooldownTicks = 100;
+let mineMaxActivePerPlayer = 3;
 let attackRange = 22;
 let hitsToDie = 3;
 let mineHitsToDestroy = 2;
@@ -573,9 +578,29 @@ function updateHud() {
   const deaths = selfPlayer ? Number(selfPlayer.deaths || 0) : 0;
   statsNode.textContent = `Players: ${alivePlayers}/${maxPlayers} | K: ${kills} | D: ${deaths}`;
   const mineRemaining = mineCooldownRemainingSeconds(selfPlayer);
-  mineCooldownValueNode.textContent = mineRemaining <= 0 ? 'READY' : `${mineRemaining.toFixed(1)}s`;
+  const activeMines = Array.isArray(worldState.mines)
+    ? worldState.mines.filter((mine) => Number(mine.owner_user_id) === Number(myUserId)).length
+    : 0;
+  const maxMines = Math.max(1, mineMaxActivePerPlayer);
+  const currentShield = selfPlayer ? Math.max(0, Math.floor(Number(selfPlayer.shield_points ?? 0))) : 0;
+  const maxShield = Math.max(0, shieldPoints);
+  if (mineCooldownLabelNode) {
+    mineCooldownLabelNode.textContent = `MINA ${activeMines}/${maxMines}`;
+  }
+  if (shieldRegenLabelNode) {
+    shieldRegenLabelNode.textContent = `ESCUDO ${currentShield}/${maxShield}`;
+  }
+  if (activeMines >= maxMines) {
+    mineCooldownValueNode.textContent = 'FULL';
+  } else {
+    mineCooldownValueNode.textContent = mineRemaining <= 0 ? 'READY' : `${mineRemaining.toFixed(1)}s`;
+  }
   const shieldRemaining = shieldRegenRemainingSeconds(selfPlayer);
-  shieldRegenValueNode.textContent = shieldRemaining <= 0 ? 'READY' : `${shieldRemaining.toFixed(1)}s`;
+  if (maxShield > 0 && currentShield >= maxShield) {
+    shieldRegenValueNode.textContent = 'FULL';
+  } else {
+    shieldRegenValueNode.textContent = shieldRemaining <= 0 ? 'READY' : `${shieldRemaining.toFixed(1)}s`;
+  }
 }
 
 function drawRectHealthBar(centerX, topY, width, height, ratio, fillColor) {
@@ -1194,6 +1219,18 @@ function applyCanvasScale() {
   const scale = Math.min(availableWidth / DESIGN_WIDTH, availableHeight / DESIGN_HEIGHT);
   canvas.style.width = `${Math.floor(DESIGN_WIDTH * scale)}px`;
   canvas.style.height = `${Math.floor(DESIGN_HEIGHT * scale)}px`;
+  syncBottomHudToCanvas();
+}
+
+function syncBottomHudToCanvas() {
+  const panel = canvas.closest('.game-panel');
+  if (!panel || !mineCooldownBoxNode || !shieldRegenBoxNode) return;
+  const panelRect = panel.getBoundingClientRect();
+  const canvasRect = canvas.getBoundingClientRect();
+  const distanceToCanvasBottom = Math.max(0, panelRect.bottom - canvasRect.bottom);
+  const bottomInsideCanvas = Math.round(distanceToCanvasBottom + 10);
+  mineCooldownBoxNode.style.bottom = `${bottomInsideCanvas}px`;
+  shieldRegenBoxNode.style.bottom = `${bottomInsideCanvas}px`;
 }
 
 function scheduleCanvasScale() {
@@ -1215,6 +1252,9 @@ async function fetchSession() {
   }
   myUserId = data.user_id;
   if (typeof data.mine_cooldown_ticks === 'number') mineCooldownTicks = Math.max(1, Math.floor(data.mine_cooldown_ticks));
+  if (typeof data.mine_max_active_per_player === 'number') {
+    mineMaxActivePerPlayer = Math.max(1, Math.floor(data.mine_max_active_per_player));
+  }
   if (typeof data.attack_range === 'number') attackRange = Math.max(0.1, Number(data.attack_range));
   if (typeof data.render_smoothing === 'number') {
     renderSmoothing = Math.max(0, Math.min(1, data.render_smoothing));

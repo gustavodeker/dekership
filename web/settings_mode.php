@@ -22,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $fireCooldownTicks = (int) ($_POST['fire_cooldown_ticks'] ?? 6);
             $attackRange = (float) ($_POST['attack_range'] ?? 22);
             $mineCooldownTicks = (int) ($_POST['mine_cooldown_ticks'] ?? 100);
+            $mineMaxActivePerPlayer = (int) ($_POST['mine_max_active_per_player'] ?? 3);
             $wsMode = (string) ($_POST['ws_mode'] ?? 'vps');
             $renderSmoothing = (float) ($_POST['render_smoothing'] ?? 0.25);
             $playerHitboxRadius = (float) ($_POST['player_hitbox_radius'] ?? 5.4);
@@ -46,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 || $fireCooldownTicks <= 0
                 || $attackRange <= 0
                 || $mineCooldownTicks <= 0
+                || $mineMaxActivePerPlayer <= 0
                 || !in_array($wsMode, ['vps', 'local'], true)
                 || $renderSmoothing < 0
                 || $renderSmoothing > 1
@@ -77,6 +79,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute(['setting_key' => $modePrefix . 'fire_cooldown_ticks', 'setting_value' => (string) $fireCooldownTicks]);
             $stmt->execute(['setting_key' => $modePrefix . 'attack_range', 'setting_value' => (string) $attackRange]);
             $stmt->execute(['setting_key' => $modePrefix . 'mine_cooldown_ticks', 'setting_value' => (string) $mineCooldownTicks]);
+            $stmt->execute([
+                'setting_key' => $modePrefix . 'mine_max_active_per_player',
+                'setting_value' => (string) $mineMaxActivePerPlayer,
+            ]);
             $stmt->execute(['setting_key' => $modePrefix . 'render_smoothing', 'setting_value' => (string) $renderSmoothing]);
             $stmt->execute(['setting_key' => $modePrefix . 'player_hitbox_radius', 'setting_value' => (string) $playerHitboxRadius]);
             $stmt->execute(['setting_key' => $modePrefix . 'projectile_hitbox_radius', 'setting_value' => (string) $projectileHitboxRadius]);
@@ -175,6 +181,10 @@ render_header($settingsTitle);
                     <label>
                         <span>Cooldown da mina (ticks)</span>
                         <input type="number" step="1" min="1" name="mine_cooldown_ticks" value="<?= htmlspecialchars($getSetting('mine_cooldown_ticks', '100'), ENT_QUOTES, 'UTF-8') ?>" required>
+                    </label>
+                    <label>
+                        <span>Maximo simultaneo por player</span>
+                        <input type="number" step="1" min="1" name="mine_max_active_per_player" value="<?= htmlspecialchars($getSetting('mine_max_active_per_player', '3'), ENT_QUOTES, 'UTF-8') ?>" required>
                     </label>
                     <label>
                         <span>Hits para destruir mina</span>

@@ -145,12 +145,6 @@ class OpenWorldService:
             player = self.state.players.pop(user_id, None)
             if player is None:
                 return False
-            self.state.projectiles = [
-                projectile
-                for projectile in self.state.projectiles
-                if not (projectile.owner_kind == "player" and projectile.owner_user_id == user_id)
-            ]
-            self.state.mines = [mine for mine in self.state.mines if mine.owner_user_id != user_id]
             return True
 
     async def apply_input(
@@ -313,7 +307,12 @@ class OpenWorldService:
         fire_cooldown_ticks = max(1, int(game_settings["fire_cooldown_ticks"]))
         attack_range = max(0.1, float(game_settings["attack_range"]))
         mine_cooldown_ticks = max(1, int(game_settings["mine_cooldown_ticks"]))
+        mine_max_active_per_player = max(1, int(game_settings["mine_max_active_per_player"]))
         shield_points_max = max(0, int(game_settings["shield_points"]))
+        border_padding = max(
+            self.player_collision_radius,
+            float(game_settings["player_hitbox_radius"]) * self.visual_x_axis_factor,
+        )
 
         for player in self.state.players.values():
             self._sync_shield_state(player, shield_points_max, self.state.tick)
@@ -331,11 +330,11 @@ class OpenWorldService:
             move_x = input_x * self.visual_x_axis_factor
             move_y = input_y
 
-            next_x = max(0.0, min(100.0, player.x + (move_x * movement_speed)))
+            next_x = max(border_padding, min(100.0 - border_padding, player.x + (move_x * movement_speed)))
             if not self._collides_with_obstacle(next_x, player.y, self.player_collision_radius):
                 player.x = next_x
 
-            next_y = max(0.0, min(100.0, player.y + (move_y * movement_speed)))
+            next_y = max(border_padding, min(100.0 - border_padding, player.y + (move_y * movement_speed)))
             if not self._collides_with_obstacle(player.x, next_y, self.player_collision_radius):
                 player.y = next_y
 
@@ -383,6 +382,9 @@ class OpenWorldService:
             if player.mine_requested:
                 player.mine_requested = False
                 if (self.state.tick - player.last_mine_tick) >= mine_cooldown_ticks:
+                    owned_mines = sum(1 for mine in self.state.mines if mine.owner_user_id == player.user_id)
+                    if owned_mines >= mine_max_active_per_player:
+                        continue
                     player.last_mine_tick = self.state.tick
                     self.state.mines.append(
                         Mine(
@@ -471,20 +473,40 @@ class OpenWorldService:
                 continue
 
             attacker = self.state.players.get(mine.owner_user_id)
-            if attacker is None:
-                continue
             life_damage_applied = self._apply_hit_damage(target, shield_points_max, self.state.tick)
             await self.connection_manager.broadcast_open_world_hit(
                 self.state,
-                attacker_id=attacker.user_id,
+                attacker_id=mine.owner_user_id,
                 target_id=target.user_id,
                 source="mine",
                 shield_blocked=not life_damage_applied,
-                attacker_kind="player",
+                attacker_kind="player" if attacker is not None else "neutral",
                 attacker_monster_id=None,
             )
             if life_damage_applied and target.damage_taken >= hits_to_win:
-                await self._kill_player(attacker, target)
+                if attacker is not None:
+                    await self._kill_player(attacker, target)
+                else:
+                    target.deaths += 1
+                    target.alive = False
+                    target.damage_taken = 0
+                    target.shield_points = 0
+                    target.last_damage_tick = self.state.tick
+                    target.last_shield_regen_tick = self.state.tick
+                    target.dead_until_tick = self.state.tick + (3 * self.tick_rate)
+                    target.invulnerable_until_tick = 0
+                    target.move_x = 0
+                    target.move_y = 0
+                    target.shoot_requested = False
+                    target.mine_requested = False
+                    target.target_kind = None
+                    target.target_id = None
+                    await self.connection_manager.broadcast_open_world_death(
+                        self.state,
+                        target_id=target.user_id,
+                        killer_id=mine.owner_user_id,
+                        respawn_seconds=3,
+                    )
 
         self.state.mines = active
 
@@ -595,20 +617,40 @@ class OpenWorldService:
                         continue
 
                     attacker = self.state.players.get(projectile.owner_user_id)
-                    if attacker is None:
-                        continue
                     life_damage_applied = self._apply_hit_damage(target, shield_points_max, self.state.tick)
                     await self.connection_manager.broadcast_open_world_hit(
                         self.state,
-                        attacker_id=attacker.user_id,
+                        attacker_id=projectile.owner_user_id,
                         target_id=target.user_id,
                         source="projectile",
                         shield_blocked=not life_damage_applied,
-                        attacker_kind="player",
+                        attacker_kind="player" if attacker is not None else "neutral",
                         attacker_monster_id=None,
                     )
                     if life_damage_applied and target.damage_taken >= hits_to_win:
-                        await self._kill_player(attacker, target)
+                        if attacker is not None:
+                            await self._kill_player(attacker, target)
+                        else:
+                            target.deaths += 1
+                            target.alive = False
+                            target.damage_taken = 0
+                            target.shield_points = 0
+                            target.last_damage_tick = self.state.tick
+                            target.last_shield_regen_tick = self.state.tick
+                            target.dead_until_tick = self.state.tick + (3 * self.tick_rate)
+                            target.invulnerable_until_tick = 0
+                            target.move_x = 0
+                            target.move_y = 0
+                            target.shoot_requested = False
+                            target.mine_requested = False
+                            target.target_kind = None
+                            target.target_id = None
+                            await self.connection_manager.broadcast_open_world_death(
+                                self.state,
+                                target_id=target.user_id,
+                                killer_id=projectile.owner_user_id,
+                                respawn_seconds=3,
+                            )
                     continue
                 active.append(projectile)
                 continue
