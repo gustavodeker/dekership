@@ -39,6 +39,8 @@ $playerHitboxRadius = 5.4;
 $projectileHitboxRadius = 0.6;
 $mineHitboxRadius = 2.4;
 $monsterHitboxRadius = 5.4;
+$monsterDetectionRadius = 26.0;
+$monsterAttackRadius = 16.0;
 $mineCooldownTicks = 100;
 $mineMaxActivePerPlayer = 3;
 $attackRange = 22.0;
@@ -47,6 +49,7 @@ $mineHitsToDestroy = 2;
 $shieldPoints = 2;
 $shieldRegenSeconds = 10;
 $showHitbox = true;
+$showMonsterRanges = false;
 $wsMode = 'vps';
 $mode = (string) ($_GET['mode'] ?? '1v1');
 if (!in_array($mode, ['1v1', 'open_world'], true)) {
@@ -71,6 +74,8 @@ try {
     $projectileHitboxRadius = (float) $readModeSetting('projectile_hitbox_radius', '0.6');
     $mineHitboxRadius = (float) $readModeSetting('mine_hitbox_radius', '2.4');
     $monsterHitboxRadius = (float) $readModeSetting('monster_hitbox_radius', '5.4');
+    $monsterDetectionRadius = (float) $readModeSetting('monster_detection_radius', '26');
+    $monsterAttackRadius = (float) $readModeSetting('monster_attack_radius', '16');
     $mineCooldownTicks = (int) (float) $readModeSetting('mine_cooldown_ticks', '100');
     $mineMaxActivePerPlayer = (int) (float) $readModeSetting('mine_max_active_per_player', '3');
     $attackRange = (float) $readModeSetting('attack_range', '22');
@@ -79,6 +84,7 @@ try {
     $shieldPoints = (int) (float) $readModeSetting('shield_points', '2');
     $shieldRegenSeconds = (int) (float) $readModeSetting('shield_regen_seconds', '10');
     $showHitbox = $readModeSetting('show_hitbox', '1') !== '0';
+    $showMonsterRanges = $readModeSetting('show_monster_ranges', '0') !== '0';
     if (isset($settings['ws_mode'])) {
         $candidateWsMode = (string) $settings['ws_mode'];
         if (in_array($candidateWsMode, ['vps', 'local'], true)) {
@@ -91,6 +97,8 @@ try {
     $projectileHitboxRadius = 0.6;
     $mineHitboxRadius = 2.4;
     $monsterHitboxRadius = 5.4;
+    $monsterDetectionRadius = 26.0;
+    $monsterAttackRadius = 16.0;
     $mineCooldownTicks = 100;
     $mineMaxActivePerPlayer = 3;
     $attackRange = 22.0;
@@ -99,6 +107,7 @@ try {
     $shieldPoints = 2;
     $shieldRegenSeconds = 10;
     $showHitbox = true;
+    $showMonsterRanges = false;
     $wsMode = 'vps';
 }
 $renderSmoothing = max(0.0, min(1.0, $renderSmoothing));
@@ -106,6 +115,8 @@ $playerHitboxRadius = max(0.1, $playerHitboxRadius);
 $projectileHitboxRadius = max(0.1, $projectileHitboxRadius);
 $mineHitboxRadius = max(0.1, $mineHitboxRadius);
 $monsterHitboxRadius = max(0.1, $monsterHitboxRadius);
+$monsterDetectionRadius = max(0.1, $monsterDetectionRadius);
+$monsterAttackRadius = max(0.1, $monsterAttackRadius);
 $mineCooldownTicks = max(1, $mineCooldownTicks);
 $mineMaxActivePerPlayer = max(1, $mineMaxActivePerPlayer);
 $attackRange = max(0.1, $attackRange);
@@ -129,6 +140,8 @@ echo json_encode([
     'projectile_hitbox_radius' => $projectileHitboxRadius,
     'mine_hitbox_radius' => $mineHitboxRadius,
     'monster_hitbox_radius' => $monsterHitboxRadius,
+    'monster_detection_radius' => $monsterDetectionRadius,
+    'monster_attack_radius' => $monsterAttackRadius,
     'mine_cooldown_ticks' => $mineCooldownTicks,
     'mine_max_active_per_player' => $mineMaxActivePerPlayer,
     'attack_range' => $attackRange,
@@ -137,6 +150,7 @@ echo json_encode([
     'shield_points' => $shieldPoints,
     'shield_regen_seconds' => $shieldRegenSeconds,
     'show_hitbox' => $showHitbox,
+    'show_monster_ranges' => $showMonsterRanges,
     'mode' => $mode,
     'ws_mode' => $wsMode,
     'ws_url' => $wsUrl,

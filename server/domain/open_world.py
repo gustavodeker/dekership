@@ -51,6 +51,8 @@ class OpenWorldMonster:
     max_hp: int
     move_target_x: float
     move_target_y: float
+    target_player_id: int | None = None
+    aggro_player_ids: list[int] = field(default_factory=list)
     last_shot_tick: int = 0
     last_retarget_tick: int = 0
 
@@ -407,32 +409,32 @@ class OpenWorldService:
         monster_speed = float(game_settings["monster_move_speed"]) * self.visual_speed_factor
         fire_cooldown_ticks = max(1, int(game_settings["monster_fire_cooldown_ticks"]))
         projectile_speed = float(game_settings["monster_projectile_speed"]) * self.visual_speed_factor
+        monster_detection_radius = max(0.1, float(game_settings["monster_detection_radius"]))
+        monster_attack_radius = max(0.1, float(game_settings["monster_attack_radius"]))
+        monster_target_priority = str(game_settings.get("monster_target_priority", "attack_order"))
+        player_hitbox_radius = max(0.1, float(game_settings["player_hitbox_radius"]))
 
         for monster in self.state.monsters.values():
-            if (self.state.tick - monster.last_retarget_tick) >= self.tick_rate * 3 or self._visual_distance(
-                monster.x, monster.y, monster.move_target_x, monster.move_target_y
-            ) <= 1.2:
-                monster.move_target_x, monster.move_target_y = self._random_walk_target()
-                monster.last_retarget_tick = self.state.tick
-
-            delta_target_x = monster.move_target_x - monster.x
-            delta_target_y = monster.move_target_y - monster.y
-            distance_to_target = math.hypot(delta_target_x, delta_target_y) or 1.0
-            step_x = (delta_target_x / distance_to_target) * monster_speed * self.visual_x_axis_factor
-            step_y = (delta_target_y / distance_to_target) * monster_speed
-
-            next_x = max(0.0, min(100.0, monster.x + step_x))
-            if not self._collides_with_obstacle(next_x, monster.y, self.monster_collision_radius):
-                monster.x = next_x
-            next_y = max(0.0, min(100.0, monster.y + step_y))
-            if not self._collides_with_obstacle(monster.x, next_y, self.monster_collision_radius):
-                monster.y = next_y
-
-            target_player = self._nearest_alive_player(monster.x, monster.y)
+            target_player = self._resolve_monster_priority_target(monster, monster_target_priority)
             if target_player is not None:
+                monster.target_player_id = target_player.user_id
+            else:
+                target_player = self._resolve_monster_target(monster.target_player_id)
+            if target_player is None:
+                target_player = self._acquire_monster_target(monster.x, monster.y, monster_detection_radius)
+                if target_player is not None:
+                    monster.target_player_id = target_player.user_id
+
+            if target_player is not None:
+                monster.move_target_x = target_player.x
+                monster.move_target_y = target_player.y
                 monster.aim_x = target_player.x
                 monster.aim_y = target_player.y
-                if (self.state.tick - monster.last_shot_tick) >= fire_cooldown_ticks:
+                self._move_monster_towards(monster, target_player.x, target_player.y, monster_speed)
+
+                target_distance = self._visual_distance(monster.x, monster.y, target_player.x, target_player.y)
+                target_distance = max(0.0, target_distance - max(player_hitbox_radius, self.player_collision_radius))
+                if target_distance <= monster_attack_radius and (self.state.tick - monster.last_shot_tick) >= fire_cooldown_ticks:
                     dx = target_player.x - monster.x
                     dy = target_player.y - monster.y
                     distance = math.hypot(dx, dy) or 1.0
@@ -451,6 +453,17 @@ class OpenWorldService:
                         )
                     )
                     self.state.next_projectile_id += 1
+                continue
+
+            monster.target_player_id = None
+            if (self.state.tick - monster.last_retarget_tick) >= self.tick_rate * 3 or self._visual_distance(
+                monster.x, monster.y, monster.move_target_x, monster.move_target_y
+            ) <= 1.2:
+                monster.move_target_x, monster.move_target_y = self._random_walk_target()
+                monster.last_retarget_tick = self.state.tick
+            monster.aim_x = monster.move_target_x
+            monster.aim_y = monster.move_target_y
+            self._move_monster_towards(monster, monster.move_target_x, monster.move_target_y, monster_speed)
 
     async def _advance_mines(self, game_settings: dict[str, float]) -> None:
         hits_to_win = max(1, int(game_settings["hits_to_win"]))
@@ -592,6 +605,7 @@ class OpenWorldService:
                         expected_monster_id=projectile.target_entity_id if projectile.target_kind == "monster" else None,
                     )
                     if hit_monster is not None:
+                        self._register_monster_attacker(hit_monster, projectile.owner_user_id)
                         hit_monster.hp = max(0, hit_monster.hp - 1)
                         destroyed = hit_monster.hp <= 0
                         await self.connection_manager.broadcast_open_world_monster_hit(
@@ -788,17 +802,85 @@ class OpenWorldService:
                 closest = player
         return closest
 
-    def _nearest_alive_player(self, x: float, y: float) -> OpenWorldPlayer | None:
-        closest: OpenWorldPlayer | None = None
-        closest_distance = float("inf")
+    def _resolve_monster_target(self, target_player_id: int | None) -> OpenWorldPlayer | None:
+        if target_player_id is None:
+            return None
+        target_player = self.state.players.get(target_player_id)
+        if target_player is None:
+            return None
+        if not target_player.alive:
+            return None
+        return target_player
+
+    def _resolve_monster_priority_target(
+        self,
+        monster: OpenWorldMonster,
+        target_priority: str,
+    ) -> OpenWorldPlayer | None:
+        if target_priority != "attack_order":
+            return None
+        if not monster.aggro_player_ids:
+            return None
+        valid_attackers: list[int] = []
+        selected_target: OpenWorldPlayer | None = None
+        for attacker_id in monster.aggro_player_ids:
+            target_player = self._resolve_monster_target(attacker_id)
+            if target_player is None:
+                continue
+            valid_attackers.append(attacker_id)
+            if selected_target is None:
+                selected_target = target_player
+        monster.aggro_player_ids = valid_attackers
+        return selected_target
+
+    def _register_monster_attacker(self, monster: OpenWorldMonster, attacker_user_id: int) -> None:
+        attacker = self._resolve_monster_target(attacker_user_id)
+        if attacker is None:
+            return
+        if attacker_user_id in monster.aggro_player_ids:
+            return
+        monster.aggro_player_ids.append(attacker_user_id)
+        if monster.target_player_id is None:
+            monster.target_player_id = attacker_user_id
+
+    def _acquire_monster_target(self, x: float, y: float, detection_radius: float) -> OpenWorldPlayer | None:
         for player in self.state.players.values():
             if not player.alive:
                 continue
             distance = self._visual_distance(x, y, player.x, player.y)
-            if distance < closest_distance:
-                closest_distance = distance
-                closest = player
-        return closest
+            if distance <= detection_radius:
+                return player
+        return None
+
+    def _move_monster_towards(self, monster: OpenWorldMonster, target_x: float, target_y: float, speed: float) -> None:
+        if speed <= 0:
+            return
+        delta_x_visual = (target_x - monster.x) / self.visual_x_axis_factor
+        delta_y = target_y - monster.y
+        distance_visual = math.hypot(delta_x_visual, delta_y)
+        if distance_visual <= 0.001:
+            return
+
+        base_angle = math.atan2(delta_y, delta_x_visual)
+        step_visual = min(speed, distance_visual)
+        for offset_deg in (0, 20, -20, 40, -40, 60, -60, 90, -90, 130, -130, 180):
+            angle = base_angle + math.radians(offset_deg)
+            step_x = math.cos(angle) * step_visual * self.visual_x_axis_factor
+            step_y = math.sin(angle) * step_visual
+
+            next_x = max(
+                self.monster_collision_radius,
+                min(100.0 - self.monster_collision_radius, monster.x + step_x),
+            )
+            next_y = max(
+                self.monster_collision_radius,
+                min(100.0 - self.monster_collision_radius, monster.y + step_y),
+            )
+            if self._collides_with_obstacle(next_x, next_y, self.monster_collision_radius):
+                continue
+            monster.x = next_x
+            monster.y = next_y
+            return
 
     def _find_hit_monster(
         self,

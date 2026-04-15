@@ -36,9 +36,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $monsterLife = (int) ($_POST['monster_life'] ?? 6);
             $monsterMoveSpeed = (float) ($_POST['monster_move_speed'] ?? 1.2);
             $monsterHitboxRadius = (float) ($_POST['monster_hitbox_radius'] ?? 5.4);
+            $monsterDetectionRadius = (float) ($_POST['monster_detection_radius'] ?? 26);
+            $monsterAttackRadius = (float) ($_POST['monster_attack_radius'] ?? 16);
+            $monsterTargetPriority = (string) ($_POST['monster_target_priority'] ?? 'attack_order');
             $monsterProjectileSpeed = (float) ($_POST['monster_projectile_speed'] ?? 1.1);
             $monsterFireCooldownTicks = (int) ($_POST['monster_fire_cooldown_ticks'] ?? 35);
             $monsterRespawnSeconds = (int) ($_POST['monster_respawn_seconds'] ?? 5);
+            $showMonsterRanges = isset($_POST['show_monster_ranges']) ? 1 : 0;
             $showHitbox = isset($_POST['show_hitbox']) ? 1 : 0;
 
             if (
@@ -63,6 +67,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 || $monsterLife <= 0
                 || $monsterMoveSpeed <= 0
                 || $monsterHitboxRadius <= 0
+                || $monsterDetectionRadius <= 0
+                || $monsterAttackRadius <= 0
+                || !in_array($monsterTargetPriority, ['attack_order'], true)
                 || $monsterProjectileSpeed <= 0
                 || $monsterFireCooldownTicks <= 0
                 || $monsterRespawnSeconds <= 0
@@ -100,9 +107,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute(['setting_key' => $modePrefix . 'monster_life', 'setting_value' => (string) $monsterLife]);
             $stmt->execute(['setting_key' => $modePrefix . 'monster_move_speed', 'setting_value' => (string) $monsterMoveSpeed]);
             $stmt->execute(['setting_key' => $modePrefix . 'monster_hitbox_radius', 'setting_value' => (string) $monsterHitboxRadius]);
+            $stmt->execute(['setting_key' => $modePrefix . 'monster_detection_radius', 'setting_value' => (string) $monsterDetectionRadius]);
+            $stmt->execute(['setting_key' => $modePrefix . 'monster_attack_radius', 'setting_value' => (string) $monsterAttackRadius]);
+            $stmt->execute(['setting_key' => $modePrefix . 'monster_target_priority', 'setting_value' => $monsterTargetPriority]);
             $stmt->execute(['setting_key' => $modePrefix . 'monster_projectile_speed', 'setting_value' => (string) $monsterProjectileSpeed]);
             $stmt->execute(['setting_key' => $modePrefix . 'monster_fire_cooldown_ticks', 'setting_value' => (string) $monsterFireCooldownTicks]);
             $stmt->execute(['setting_key' => $modePrefix . 'monster_respawn_seconds', 'setting_value' => (string) $monsterRespawnSeconds]);
+            $stmt->execute(['setting_key' => $modePrefix . 'show_monster_ranges', 'setting_value' => (string) $showMonsterRanges]);
             $stmt->execute(['setting_key' => $modePrefix . 'show_hitbox', 'setting_value' => (string) $showHitbox]);
             $stmt->execute(['setting_key' => 'ws_mode', 'setting_value' => $wsMode]);
             $success = 'Configuracoes salvas';
@@ -253,6 +264,21 @@ render_header($settingsTitle);
                             <input type="number" step="0.1" min="0.1" name="monster_hitbox_radius" value="<?= htmlspecialchars($getSetting('monster_hitbox_radius', '5.4'), ENT_QUOTES, 'UTF-8') ?>" required>
                         </label>
                         <label>
+                            <span>Raio de detecção</span>
+                            <input type="number" step="0.1" min="0.1" name="monster_detection_radius" value="<?= htmlspecialchars($getSetting('monster_detection_radius', '26'), ENT_QUOTES, 'UTF-8') ?>" required>
+                        </label>
+                        <label>
+                            <span>Raio de ataque</span>
+                            <input type="number" step="0.1" min="0.1" name="monster_attack_radius" value="<?= htmlspecialchars($getSetting('monster_attack_radius', '16'), ENT_QUOTES, 'UTF-8') ?>" required>
+                        </label>
+                        <label>
+                            <span>Preferência de alvo</span>
+                            <?php $monsterTargetPriority = (string) $getSetting('monster_target_priority', 'attack_order'); ?>
+                            <select name="monster_target_priority" required>
+                                <option value="attack_order" <?= $monsterTargetPriority === 'attack_order' ? 'selected' : '' ?>>Ordem de ataque</option>
+                            </select>
+                        </label>
+                        <label>
                             <span>Velocidade do projetil</span>
                             <input type="number" step="0.1" min="0.1" name="monster_projectile_speed" value="<?= htmlspecialchars($getSetting('monster_projectile_speed', '1.1'), ENT_QUOTES, 'UTF-8') ?>" required>
                         </label>
@@ -263,6 +289,10 @@ render_header($settingsTitle);
                         <label>
                             <span>Respawn do monstro (segundos)</span>
                             <input type="number" step="1" min="1" name="monster_respawn_seconds" value="<?= htmlspecialchars($getSetting('monster_respawn_seconds', '5'), ENT_QUOTES, 'UTF-8') ?>" required>
+                        </label>
+                        <label>
+                            <span>Mostrar raios (detecção/ataque)</span>
+                            <input type="checkbox" name="show_monster_ranges" value="1" <?= ($getSetting('show_monster_ranges', '0') === '1') ? 'checked' : '' ?>>
                         </label>
                     <?php endif; ?>
                 </div>

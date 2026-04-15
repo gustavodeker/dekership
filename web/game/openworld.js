@@ -37,9 +37,12 @@ let shieldPoints = 2;
 let shieldRegenSeconds = 10;
 let playerHitRadius = 5.4;
 let monsterHitRadius = 5.4;
+let monsterDetectionRadius = 26;
+let monsterAttackRadius = 16;
 let projectileHitRadius = 0.6;
 let mineHitRadius = 2.4;
 let showHitbox = true;
+let showMonsterRanges = false;
 let lastSentAt = 0;
 let flushTimer = null;
 let resizeHandle = null;
@@ -906,6 +909,22 @@ function drawMonster(monster) {
     context.restore();
   }
 
+  if (showMonsterRanges) {
+    context.save();
+    context.setLineDash([8, 7]);
+    context.lineWidth = 1.4;
+    context.strokeStyle = 'rgba(148, 163, 184, 0.75)';
+    context.beginPath();
+    context.arc(x, y, arenaRadiusToCanvasRadius(monsterDetectionRadius), 0, Math.PI * 2);
+    context.stroke();
+    context.strokeStyle = 'rgba(248, 113, 113, 0.82)';
+    context.beginPath();
+    context.arc(x, y, arenaRadiusToCanvasRadius(monsterAttackRadius), 0, Math.PI * 2);
+    context.stroke();
+    context.setLineDash([]);
+    context.restore();
+  }
+
   const maxHp = Math.max(1, Number(monster.max_hp || 1));
   const hp = Math.max(0, Number(monster.hp || 0));
   drawRectHealthBar(x, y - 34, 52, 7, hp / maxHp, '#f97316');
@@ -1386,9 +1405,16 @@ async function fetchSession() {
   if (typeof data.shield_regen_seconds === 'number') shieldRegenSeconds = Math.max(1, Math.floor(data.shield_regen_seconds));
   if (typeof data.player_hitbox_radius === 'number') playerHitRadius = Math.max(0.1, data.player_hitbox_radius);
   if (typeof data.monster_hitbox_radius === 'number') monsterHitRadius = Math.max(0.1, data.monster_hitbox_radius);
+  if (typeof data.monster_detection_radius === 'number') {
+    monsterDetectionRadius = Math.max(0.1, data.monster_detection_radius);
+  }
+  if (typeof data.monster_attack_radius === 'number') {
+    monsterAttackRadius = Math.max(0.1, data.monster_attack_radius);
+  }
   if (typeof data.projectile_hitbox_radius === 'number') projectileHitRadius = Math.max(0.1, data.projectile_hitbox_radius);
   if (typeof data.mine_hitbox_radius === 'number') mineHitRadius = Math.max(0.1, data.mine_hitbox_radius);
   if (typeof data.show_hitbox === 'boolean') showHitbox = data.show_hitbox;
+  if (typeof data.show_monster_ranges === 'boolean') showMonsterRanges = data.show_monster_ranges;
   return data;
 }
 

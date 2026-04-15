@@ -151,9 +151,13 @@ function ensure_admin_schema(): void
         ('open_world_monster_life', '6'),
         ('open_world_monster_move_speed', '1.2'),
         ('open_world_monster_hitbox_radius', '5.4'),
+        ('open_world_monster_detection_radius', '26'),
+        ('open_world_monster_attack_radius', '16'),
+        ('open_world_monster_target_priority', 'attack_order'),
         ('open_world_monster_projectile_speed', '1.1'),
         ('open_world_monster_fire_cooldown_ticks', '35'),
         ('open_world_monster_respawn_seconds', '5'),
+        ('open_world_show_monster_ranges', '0'),
         ('open_world_show_hitbox', '1'),
         ('projectile_speed', '1.6'),
         ('movement_speed', '3.0'),
@@ -175,9 +179,13 @@ function ensure_admin_schema(): void
         ('monster_life', '6'),
         ('monster_move_speed', '1.2'),
         ('monster_hitbox_radius', '5.4'),
+        ('monster_detection_radius', '26'),
+        ('monster_attack_radius', '16'),
+        ('monster_target_priority', 'attack_order'),
         ('monster_projectile_speed', '1.1'),
         ('monster_fire_cooldown_ticks', '35'),
         ('monster_respawn_seconds', '5'),
+        ('show_monster_ranges', '0'),
         ('show_hitbox', '1')
         ON DUPLICATE KEY UPDATE setting_value = setting_value"
     );
