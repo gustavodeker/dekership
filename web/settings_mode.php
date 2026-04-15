@@ -21,6 +21,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hitsToWin = (int) ($_POST['hits_to_win'] ?? 3);
             $fireCooldownTicks = (int) ($_POST['fire_cooldown_ticks'] ?? 6);
             $attackRange = (float) ($_POST['attack_range'] ?? 22);
+            $laserThickness = (float) ($_POST['laser_thickness'] ?? 2.1);
+            $laserLength = (float) ($_POST['laser_length'] ?? 5.4);
+            $laserGap = (float) ($_POST['laser_gap'] ?? 7.6);
             $mineCooldownTicks = (int) ($_POST['mine_cooldown_ticks'] ?? 100);
             $mineMaxActivePerPlayer = (int) ($_POST['mine_max_active_per_player'] ?? 3);
             $wsMode = (string) ($_POST['ws_mode'] ?? 'vps');
@@ -52,6 +55,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 || $hitsToWin <= 0
                 || $fireCooldownTicks <= 0
                 || $attackRange <= 0
+                || $laserThickness <= 0
+                || $laserLength <= 0
+                || $laserGap <= 0
                 || $mineCooldownTicks <= 0
                 || $mineMaxActivePerPlayer <= 0
                 || !in_array($wsMode, ['vps', 'local'], true)
@@ -90,6 +96,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute(['setting_key' => $modePrefix . 'hits_to_win', 'setting_value' => (string) $hitsToWin]);
             $stmt->execute(['setting_key' => $modePrefix . 'fire_cooldown_ticks', 'setting_value' => (string) $fireCooldownTicks]);
             $stmt->execute(['setting_key' => $modePrefix . 'attack_range', 'setting_value' => (string) $attackRange]);
+            $stmt->execute(['setting_key' => $modePrefix . 'laser_thickness', 'setting_value' => (string) $laserThickness]);
+            $stmt->execute(['setting_key' => $modePrefix . 'laser_length', 'setting_value' => (string) $laserLength]);
+            $stmt->execute(['setting_key' => $modePrefix . 'laser_gap', 'setting_value' => (string) $laserGap]);
             $stmt->execute(['setting_key' => $modePrefix . 'mine_cooldown_ticks', 'setting_value' => (string) $mineCooldownTicks]);
             $stmt->execute([
                 'setting_key' => $modePrefix . 'mine_max_active_per_player',
@@ -193,6 +202,18 @@ render_header($settingsTitle);
                     <label>
                         <span>Range de disparo</span>
                         <input type="number" step="0.1" min="0.1" name="attack_range" value="<?= htmlspecialchars($getSetting('attack_range', '22'), ENT_QUOTES, 'UTF-8') ?>" required>
+                    </label>
+                    <label>
+                        <span>Espessura do laser</span>
+                        <input type="number" step="0.1" min="0.1" name="laser_thickness" value="<?= htmlspecialchars($getSetting('laser_thickness', '2.1'), ENT_QUOTES, 'UTF-8') ?>" required>
+                    </label>
+                    <label>
+                        <span>Comprimento do laser</span>
+                        <input type="number" step="0.1" min="0.1" name="laser_length" value="<?= htmlspecialchars($getSetting('laser_length', '5.4'), ENT_QUOTES, 'UTF-8') ?>" required>
+                    </label>
+                    <label>
+                        <span>Distancia entre lasers</span>
+                        <input type="number" step="0.1" min="0.1" name="laser_gap" value="<?= htmlspecialchars($getSetting('laser_gap', '7.6'), ENT_QUOTES, 'UTF-8') ?>" required>
                     </label>
 
                     <h2>Minas</h2>

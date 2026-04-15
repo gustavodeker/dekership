@@ -31,6 +31,9 @@ let renderSmoothing = 0.25;
 let mineCooldownTicks = 100;
 let mineMaxActivePerPlayer = 3;
 let attackRange = 22;
+let laserThickness = 2.1;
+let laserLength = 5.4;
+let laserGap = 7.6;
 let hitsToDie = 3;
 let mineHitsToDestroy = 2;
 let shieldPoints = 2;
@@ -374,6 +377,30 @@ function getSelectedTargetPosition(snapshot = worldState) {
   if (selectedTargetType === 'mine') {
     const target = findMineById(snapshot, selectedTargetId);
     if (!target || Number(target.owner_user_id) === Number(myUserId)) return null;
+    return { x: Number(target.x), y: Number(target.y) };
+  }
+  return null;
+}
+
+function getProjectileTargetPosition(projectile, snapshot = (renderState || worldState)) {
+  if (!projectile || !snapshot) return null;
+  const targetKind = String(projectile.target_kind || '');
+  const targetId = Number(projectile.target_entity_id);
+  if (!Number.isFinite(targetId) || targetId <= 0) return null;
+
+  if (targetKind === 'player') {
+    const target = findPlayerByUserId(snapshot, targetId);
+    if (!target || !target.alive) return null;
+    return { x: Number(target.x), y: Number(target.y) };
+  }
+  if (targetKind === 'monster') {
+    const target = findMonsterById(snapshot, targetId);
+    if (!target) return null;
+    return { x: Number(target.x), y: Number(target.y) };
+  }
+  if (targetKind === 'mine') {
+    const target = findMineById(snapshot, targetId);
+    if (!target) return null;
     return { x: Number(target.x), y: Number(target.y) };
   }
   return null;
@@ -868,10 +895,48 @@ function drawProjectile(projectile) {
   const ownerKind = String(projectile.owner_kind || 'player');
   const ownProjectile = ownerKind === 'player' && Number(projectile.owner_user_id) === Number(myUserId);
   const color = ownerKind === 'monster' ? '#f59e0b' : (ownProjectile ? '#22c55e' : '#ef4444');
-  context.fillStyle = color;
-  context.beginPath();
-  context.arc(x, y, 4, 0, Math.PI * 2);
-  context.fill();
+
+  if (ownerKind === 'player') {
+    const vx = Number(projectile.velocity_x || 0);
+    const vy = Number(projectile.velocity_y || 0);
+    const speed = Math.hypot(vx, vy) || 1;
+    const dirX = vx / speed;
+    const dirY = vy / speed;
+    const normalX = -dirY;
+    const normalY = dirX;
+    const targetPos = getProjectileTargetPosition(projectile);
+    const distanceToTarget = targetPos
+      ? visualDistance(projectile.x, projectile.y, targetPos.x, targetPos.y)
+      : attackRange;
+    const rangeBase = Math.max(0.1, Number(attackRange));
+    const taperRatio = Math.max(0, Math.min(1, distanceToTarget / rangeBase));
+    const baseHalfGap = Math.max(0.2, Number(laserGap) * 0.5);
+    const rearHalfGap = Math.max(0.15, baseHalfGap * (0.2 + (0.8 * taperRatio)));
+    const frontHalfGap = Math.max(0.08, rearHalfGap * 0.28);
+    const halfLength = Math.max(0.4, Number(laserLength));
+
+    context.save();
+    context.strokeStyle = color;
+    context.lineWidth = Math.max(0.4, Number(laserThickness));
+    context.lineCap = 'round';
+    for (const side of [-1, 1]) {
+      const rearOffsetX = normalX * rearHalfGap * side;
+      const rearOffsetY = normalY * rearHalfGap * side;
+      const frontOffsetX = normalX * frontHalfGap * side;
+      const frontOffsetY = normalY * frontHalfGap * side;
+      context.beginPath();
+      context.moveTo(x + rearOffsetX - (dirX * halfLength), y + rearOffsetY - (dirY * halfLength));
+      context.lineTo(x + frontOffsetX + (dirX * halfLength), y + frontOffsetY + (dirY * halfLength));
+      context.stroke();
+    }
+    context.restore();
+  } else {
+    context.fillStyle = color;
+    context.beginPath();
+    context.arc(x, y, 4, 0, Math.PI * 2);
+    context.fill();
+  }
+
   if (showHitbox) {
     context.save();
     context.strokeStyle = ownerKind === 'monster'
@@ -1409,6 +1474,9 @@ async function fetchSession() {
     mineMaxActivePerPlayer = Math.max(1, Math.floor(data.mine_max_active_per_player));
   }
   if (typeof data.attack_range === 'number') attackRange = Math.max(0.1, Number(data.attack_range));
+  if (typeof data.laser_thickness === 'number') laserThickness = Math.max(0.1, Number(data.laser_thickness));
+  if (typeof data.laser_length === 'number') laserLength = Math.max(0.1, Number(data.laser_length));
+  if (typeof data.laser_gap === 'number') laserGap = Math.max(0.1, Number(data.laser_gap));
   if (typeof data.render_smoothing === 'number') {
     renderSmoothing = Math.max(0, Math.min(1, data.render_smoothing));
   }
