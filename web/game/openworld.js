@@ -1617,7 +1617,7 @@ window.addEventListener('keydown', (event) => {
     pendingMine = false;
     send('drop_mine');
   }
-  if ((event.key === 'Control' || event.code === 'ControlLeft' || event.code === 'ControlRight') && !event.repeat) {
+  if ((event.key === 'Shift' || event.code === 'ShiftLeft' || event.code === 'ShiftRight') && !event.repeat) {
     event.preventDefault();
     if (autoFireEnabled) setAutoFire(false);
     else if (isSelectedTargetAlive()) setAutoFire(true);
